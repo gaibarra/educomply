@@ -48,11 +48,8 @@ enum Type {
 }
 
 // Standard CORS headers for all responses
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST,OPTIONS'
-};
+import { corsHeaders as baseCors, buildCorsHeaders } from "../_shared/cors.ts";
+const corsHeaders = buildCorsHeaders({ 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
 
 // Define the expected JSON schema for the response from Gemini
 const responseSchema = {

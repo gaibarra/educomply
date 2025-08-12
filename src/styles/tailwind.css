@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom theme extensions (mirroring previous CDN config) */
+@layer base {
+  :root {
+    /* You can add CSS variables here if needed */
+  }
+}

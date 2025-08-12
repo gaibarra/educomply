@@ -3,14 +3,8 @@ declare const Deno: any;
 import { GoogleGenerativeAI } from "npm:@google/generative-ai";
 
 // CORS headers
-const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') || '*';
-const corsHeaders = {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-    'Vary': 'Origin',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS',
-    'Access-Control-Max-Age': '86400'
-};
+import { buildCorsHeaders } from "../_shared/cors.ts";
+const corsHeaders = buildCorsHeaders({ 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
 
 // Helper to parse JSON from model text
 const parseAiJson = (raw: string) => {
