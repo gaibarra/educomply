@@ -96,15 +96,15 @@ const SubTaskItem: React.FC<SubTaskItemProps> = ({ subTask, onUpdate, onDelete, 
     const handleAttachClick = () => fileInputRef.current?.click();
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files;
-        if (!files || files.length === 0) return;
+        const fileList = event.target.files as FileList | null;
+        if (!fileList || fileList.length === 0) return;
 
-        const uploadPromises = Array.from(files).map(async file => {
+        const uploadPromises = Array.from(fileList).map(async (file: File) => {
             const filePath = `${subTask.id}/${Date.now()}-${file.name}`;
             const { error: uploadError } = await supabase.storage
                 .from('task_documents')
                 .upload(filePath, file);
-            
+
             if (uploadError) throw uploadError;
 
             const { data: urlData } = supabase.storage
@@ -116,23 +116,22 @@ const SubTaskItem: React.FC<SubTaskItemProps> = ({ subTask, onUpdate, onDelete, 
                 name: file.name,
                 url: urlData.publicUrl,
                 storage_path: filePath,
-            };
+            } as Database['public']['Tables']['documents']['Insert'];
         });
 
         try {
-            const newDocsToInsert: Database['public']['Tables']['documents']['Insert'][] = await Promise.all(uploadPromises);
+            const newDocsToInsert = await Promise.all(uploadPromises);
             const { data: newDocuments, error } = await supabase
                 .from('documents')
                 .insert(newDocsToInsert)
                 .select();
-            
+
             if (error) throw error;
             if (newDocuments) {
                 onUpdate({ ...subTask, documents: [...subTask.documents, ...newDocuments] });
             }
-
-        } catch (error) {
-            console.error('Error uploading files:', error);
+        } catch (err) {
+            console.error('Error uploading files:', err);
         }
 
         if (event.target) event.target.value = '';
