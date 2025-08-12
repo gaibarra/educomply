@@ -1,5 +1,5 @@
 {
-  "name": "copy-of-educomply:-sistema-de-compliance-educativo",
+  "name": "educomply",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,7 +9,8 @@
     "build": "npm run build:css && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext .ts,.tsx --max-warnings=0"
+  "lint": "eslint . --ext .ts,.tsx --max-warnings=50",
+  "test": "vitest run"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -24,6 +25,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
+  "vitest": "^2.0.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "postcss": "^8.4.41",

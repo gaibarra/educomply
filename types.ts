@@ -283,7 +283,7 @@ export type Database = {
             audit_id: number;
             task_id: string; // Changed from number
           };
-          Update: {};
+          Update: Record<string, never>; // no editable fields currently
           Relationships: [];
       };
       institution_profile: {

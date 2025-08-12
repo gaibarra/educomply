@@ -8,7 +8,10 @@
 declare const Deno: any;
 
 export function buildCorsHeaders(extra: Partial<Record<string,string>> = {}) {
-  const origin = (Deno?.env?.get('ALLOWED_ORIGIN') || '*').trim() || '*';
+  // Support both Deno (Edge Functions) and Node (tests) env sources.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const denoEnv: any = (typeof Deno !== 'undefined' && Deno.env?.get) ? Deno.env : null;
+  const origin = (denoEnv?.get('ALLOWED_ORIGIN') || process?.env?.ALLOWED_ORIGIN || '*').trim() || '*';
   return {
     'Access-Control-Allow-Origin': origin,
     'Vary': 'Origin',
