@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { SubTask, TaskStatus, TaskComment, AttachedDocument, Profile, Database } from '../types';
+import { SubTask, TaskStatus, AttachedDocument, Profile, Database } from '../types';
 import ChatBubbleLeftRightIcon from './icons/ChatBubbleLeftRightIcon';
 import PaperClipIcon from './icons/PaperClipIcon';
 import DownloadIcon from './icons/DownloadIcon';
@@ -10,7 +10,7 @@ import StatusIcon from './icons/StatusIcon';
 interface SubTaskItemProps {
     subTask: SubTask;
     onUpdate: (updatedSubTask: SubTask) => void;
-    onDelete: (subTaskId: number) => void;
+    onDelete: (subTaskId: string) => void;
     availableTeamMembers: Profile[];
     isLastItem: boolean;
     currentUserProfile: Profile;
@@ -72,7 +72,7 @@ const SubTaskItem: React.FC<SubTaskItemProps> = ({ subTask, onUpdate, onDelete, 
     
     const handleAddComment = async () => {
         if (!newComment.trim()) return;
-        const newCommentPayload: Database['public']['Tables']['comments']['Insert'] = {
+    const newCommentPayload: Database['public']['Tables']['comments']['Insert'] = {
             sub_task_id: subTask.id,
             author_id: currentUserProfile.id,
             author_name: currentUserProfile.full_name, // denormalized
@@ -184,7 +184,7 @@ const SubTaskItem: React.FC<SubTaskItemProps> = ({ subTask, onUpdate, onDelete, 
                                 <ChatBubbleLeftRightIcon className="w-5 h-5"/>
                                 {subTask.comments.length > 0 && <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-status-danger text-white text-[9px]">{subTask.comments.length}</span>}
                             </button>
-                            <button onClick={() => onDelete(subTask.id)} className="text-slate-400 hover:text-status-danger transition-colors p-1.5 rounded-full hover:bg-red-50" aria-label="Eliminar sub-tarea"><TrashIcon className="h-5 h-5" /></button>
+                            <button onClick={() => onDelete(subTask.id)} className="text-slate-400 hover:text-status-danger transition-colors p-1.5 rounded-full hover:bg-red-50" aria-label="Eliminar sub-tarea"><TrashIcon className="w-5 h-5" /></button>
                         </div>
                     </div>
                      <div className="mt-2 text-sm">

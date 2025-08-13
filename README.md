@@ -77,6 +77,26 @@ La función `generate-document` retorna JSON con: filename, title, summary, body
 ## CI
 Workflow: `.github/workflows/ci.yml` (install -> typecheck -> lint -> build). Extender con pruebas si se añaden.
 
+## Despliegue de Edge Functions y CORS
+Para habilitar CORS correcto en funciones como `suggest-subtasks`:
+
+Opción CLI (local):
+- Instala y autentica Supabase CLI (`npm i -g supabase@^2` y `supabase login`).
+- Exporta variables:
+	- `SUPABASE_PROJECT_REF=raiccyhtjhsgmouzulhn`
+	- `ALLOWED_ORIGIN='http://localhost:5173'`
+	- `GEMINI_API_KEY='...'`
+- Sube secrets y despliega:
+	- `supabase functions secrets set --project-ref "$SUPABASE_PROJECT_REF" ALLOWED_ORIGIN="$ALLOWED_ORIGIN" GEMINI_API_KEY="$GEMINI_API_KEY"`
+	- `supabase functions deploy suggest-subtasks --project-ref "$SUPABASE_PROJECT_REF"`
+
+Opción GitHub Actions:
+- Define secrets `SUPABASE_ACCESS_TOKEN` y `GEMINI_API_KEY` en el repo.
+- Ejecuta manualmente el workflow `Deploy Supabase Functions` pasando `project_ref` y `allowed_origin`.
+
+Verificación rápida:
+- GET `https://<ref>.supabase.co/functions/v1/suggest-subtasks?health=1` debe responder 200 con `Access-Control-Allow-Origin` para tu localhost.
+
 ## Auditoría / SQL Sugerido
 Ver `audit-review/` para RLS, índices, triggers y logging recomendado (aplicar manualmente en tu instancia según necesidad).
 

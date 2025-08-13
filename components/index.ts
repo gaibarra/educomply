@@ -12,14 +12,8 @@ const levelOrder: Record<string, number> = { debug:10, info:20, warn:30, error:4
 const currentLevel = levelOrder[LOG_LEVEL] ?? 20;
 const log = (lvl: keyof typeof levelOrder, ...a:any[]) => { if (currentLevel <= levelOrder[lvl]) console.log(`[${lvl.toUpperCase()}]`, ...a); };
 
-const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') || '*';
-const corsHeaders = {
-  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-  'Vary': 'Origin',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST,OPTIONS',
-  'Access-Control-Max-Age': '86400'
-};
+// Use shared CORS helper to ensure a single valid Allow-Origin per request
+import { buildCorsHeadersForRequest } from "../supabase/functions/_shared/cors.ts";
 
 interface GenDocRequest {
   docName: string;
@@ -34,6 +28,7 @@ function decodeJwt(token:string){
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = buildCorsHeadersForRequest(req, { 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
   if (req.method === 'OPTIONS') {
     log('debug','[generate-document] Preflight OPTIONS recibido');
     return new Response('ok',{headers:corsHeaders});
@@ -46,7 +41,7 @@ Deno.serve(async (req: Request) => {
   let payload = null as any;
   if (!disableAuth) {
     const authHeader = req.headers.get('authorization');
-    if (!authHeader) return new Response(JSON.stringify({error:'Missing authorization header'}),{status:401,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  if (!authHeader) return new Response(JSON.stringify({error:'Missing authorization header'}),{status:401,headers:{...corsHeaders,'Content-Type':'application/json'}});
     payload = decodeJwt(authHeader.replace(/Bearer\s+/i,''));
     if (!payload) return new Response(JSON.stringify({error:'Invalid JWT'}),{status:401,headers:{...corsHeaders,'Content-Type':'application/json'}});
   } else {
@@ -56,7 +51,7 @@ Deno.serve(async (req: Request) => {
   let body: GenDocRequest | null = null;
   try { body = await req.json(); } catch { /* ignore */ }
   if (!body || !body.docName) {
-    return new Response(JSON.stringify({error:"Se requiere 'docName'"}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  return new Response(JSON.stringify({error:"Se requiere 'docName'"}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
   }
   const { docName, taskDescription='', category='', source='', language='es' } = body;
   const apiKey = Deno.env.get('GEMINI_API_KEY');
@@ -96,13 +91,13 @@ Idioma: ${language === 'en' ? 'English' : 'Español'}.
     log('info','[generate-document] AI raw length', text.length);
   } catch (e) {
     log('error','AI error', e);
-    return new Response(JSON.stringify({error:'Fallo al generar documento'}),{status:502,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  return new Response(JSON.stringify({error:'Fallo al generar documento'}),{status:502,headers:{...corsHeaders,'Content-Type':'application/json'}});
   }
 
   const tryParse = (raw:string)=>{ try { return JSON.parse(raw); } catch { const m=raw.match(/\{[\s\S]*\}/); if(m) { try { return JSON.parse(m[0]); } catch { return null; } } return null; }; };
   const json = tryParse(text);
   if (!json || !json.body_markdown) {
-    return new Response(JSON.stringify({error:'Salida IA inválida', raw:text.slice(0,4000)}),{status:500,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  return new Response(JSON.stringify({error:'Salida IA inválida', raw:text.slice(0,4000)}),{status:500,headers:{...corsHeaders,'Content-Type':'application/json'}});
   }
 
   const filenameSafe = (json.filename || docName).toLowerCase().replace(/[^a-z0-9-_]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'') + '.md';

@@ -1,8 +1,6 @@
-
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
-import type { Profile, InstitutionProfileRow, InstitutionLocation, InstitutionAuthority, AcademicProgram } from '../types';
+import type { Profile, InstitutionProfileRow } from '../types';
 import ExclamationTriangleIcon from './icons/ExclamationTriangleIcon';
 import PlusCircleIcon from './icons/PlusCircleIcon';
 import TrashIcon from './icons/TrashIcon';
@@ -50,7 +48,15 @@ const InstitucionView: React.FC<InstitucionViewProps> = ({ profile, institutionP
         setSaving(true);
         setError(null);
         
-        const { id, ...updateData } = localProfile;
+        const updateData = {
+            name: localProfile.name,
+            legal_representative: localProfile.legal_representative,
+            logo_url: localProfile.logo_url,
+            locations: localProfile.locations,
+            educational_levels: localProfile.educational_levels,
+            authorities: localProfile.authorities,
+            academic_programs: localProfile.academic_programs
+        };
 
         try {
             const { error: saveError, data: savedData } = await supabase

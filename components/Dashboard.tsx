@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import KpiCard from './KpiCard';
 import ComplianceItemCard from './ComplianceItemCard';
-import type { Kpi, ComplianceObligation, Profile, View, Task, TaskOverallStatus, TaskScope, TaskFromDb } from '../types';
+import type { Kpi, ComplianceObligation, Profile, View, TaskOverallStatus, TaskScope, TaskFromDb } from '../types';
 import { supabase } from '../services/supabaseClient';
 import ShieldCheckIcon from './icons/ShieldCheckIcon';
 import ClipboardCheckIcon from './icons/ClipboardCheckIcon';
@@ -12,10 +12,10 @@ import BookOpenIcon from './icons/BookOpenIcon';
 import ExclamationTriangleIcon from './icons/ExclamationTriangleIcon';
 
 const icons = [
-    <ShieldCheckIcon className="w-7 h-7 text-brand-secondary" />,
-    <ClipboardCheckIcon className="w-7 h-7 text-brand-secondary" />,
-    <ChartBarIcon className="w-7 h-7 text-brand-secondary" />,
-    <BookOpenIcon className="w-7 h-7 text-brand-secondary" />,
+    <ShieldCheckIcon key="shield" className="w-7 h-7 text-brand-secondary" />,
+    <ClipboardCheckIcon key="clip" className="w-7 h-7 text-brand-secondary" />,
+    <ChartBarIcon key="chart" className="w-7 h-7 text-brand-secondary" />,
+    <BookOpenIcon key="book" className="w-7 h-7 text-brand-secondary" />,
 ];
 
 const getTaskStatus = (task: { scope: any | null; subTasks: { status: string }[] | null }): TaskOverallStatus => {

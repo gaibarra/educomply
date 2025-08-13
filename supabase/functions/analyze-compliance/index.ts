@@ -48,8 +48,7 @@ enum Type {
 }
 
 // Standard CORS headers for all responses
-import { corsHeaders as baseCors, buildCorsHeaders } from "../_shared/cors.ts";
-const corsHeaders = buildCorsHeaders({ 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
+import { buildCorsHeadersForRequest } from "../_shared/cors.ts";
 
 // Define the expected JSON schema for the response from Gemini
 const responseSchema = {
@@ -84,6 +83,7 @@ const responseSchema = {
 };
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = buildCorsHeadersForRequest(req, { 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
   logInfo('[analyze-compliance] Nueva solicitud', req.method, req.url);
   // Handle CORS preflight requests immediately
   if (req.method === 'OPTIONS') {

@@ -81,7 +81,7 @@ const AuditoriasView: React.FC<AuditoriasViewProps> = ({ profile, institutionPro
     useEffect(() => {
         // Fetch users who can be auditors (e.g., admins or specific roles)
         const fetchAuditors = async () => {
-            const { data, error } = await supabase
+            const { data, error: _profilesError } = await supabase
                 .from('profiles')
                 .select('id, full_name, role, scope_entity')
                 // .in('role', ['admin', 'auditor_role']) // Example filter

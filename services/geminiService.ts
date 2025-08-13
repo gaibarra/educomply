@@ -12,25 +12,24 @@ import type { AiComplianceResponse, AiAuditPlanSuggestion, GeneratedReport, Pred
 //   });
 // };
 const invokeFunction = async (functionName: string, body: any) => {
-    const session = await supabase.auth.getSession();
-    const accessToken = session.data.session?.access_token;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const anonKey = (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY || (process as any)?.env?.VITE_SUPABASE_ANON_KEY || '';
+    let accessToken: string | undefined;
+    try {
+        const session = await (supabase as any).auth?.getSession?.();
+        accessToken = session?.data?.session?.access_token;
+    } catch { /* ignore */ }
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'apikey': anonKey,
+        'Authorization': `Bearer ${accessToken || anonKey}`,
     };
-    if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-    } else {
-        headers['Authorization'] = `Bearer ${anonKey}`;
-    }
     // Para analyze-compliance añadimos redundancia de transporte de 'query' para evitar casos donde el body llegue vacío
     // Supabase JS hoy no permite pasar querystring directo en invoke, así que hacemos una ruta manual SOLO para analyze-compliance
     if (functionName === 'analyze-compliance' && body?.query) {
-        try {
+    try {
             const supaUrl = (supabase as any).supabaseUrl || '';
             const url = `${supaUrl.replace(/\/$/,'')}/functions/v1/${functionName}?query=${encodeURIComponent(body.query)}`;
-            const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
             if (!res.ok) {
                 const txt = await res.text();
                 throw new Error(`Status ${res.status} ${txt}`);
@@ -42,15 +41,57 @@ const invokeFunction = async (functionName: string, body: any) => {
         }
     }
     const { data, error } = await supabase.functions.invoke(functionName, { body, headers });
-    if (error) {
-        console.error(`Error invoking Supabase function ${functionName}:`, error);
-        // await logError(error, functionName); // Descomenta si usas logging
-        if (error.message.includes('Failed to send a request')) {
-            throw new Error(`Error de red al invocar la función '${functionName}'. Verifique CORS y disponibilidad.`);
-        }
-        throw new Error(`Error al invocar la función '${functionName}': ${error.message}`);
+    if (!error) return data;
+    console.warn(`[invokeFunction] invoke() fallo para ${functionName}:`, error.message);
+    // Try anon-only retry for token-related/network-ish errors
+    if (/invalid\s*refresh\s*token|jwt|401|400/i.test(error.message)) {
+        try {
+            const h2 = { ...headers, Authorization: `Bearer ${anonKey}` };
+            const { data: d2, error: e2 } = await supabase.functions.invoke(functionName, { body, headers: h2 });
+            if (!e2) return d2;
+        } catch {/* ignore */}
     }
-    return data;
+    // If the Edge Function returned non-2xx, try manual fetch to capture error payload for better diagnostics
+    if (/non-2xx status code/i.test(error.message)) {
+        try {
+            const supaUrl = (supabase as any).supabaseUrl || '';
+            const url = `${supaUrl.replace(/\/$/,'')}/functions/v1/${functionName}`;
+            const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+            const txt = await res.text();
+            if (!res.ok) {
+                // Try to extract a concise error message from JSON
+                try {
+                    const j = JSON.parse(txt);
+                    const msg = j?.error || j?.message || txt;
+                    throw new Error(`Status ${res.status}: ${typeof msg === 'string' ? msg.slice(0,500) : ''}`);
+                } catch {
+                    throw new Error(`Status ${res.status}: ${txt.slice(0,500)}`);
+                }
+            }
+            return JSON.parse(txt);
+        } catch (non2xxFallbackErr: any) {
+            throw new Error(`Error al invocar la función '${functionName}': ${non2xxFallbackErr?.message || error.message}`);
+        }
+    }
+    if (error.message.includes('Failed to send a request')) {
+        // Manual fetch fallback with body + query redundancy
+        try {
+            const supaUrl = (supabase as any).supabaseUrl || '';
+            const base = `${supaUrl.replace(/\/$/,'')}/functions/v1/${functionName}`;
+            const qp = new URLSearchParams();
+            if (body && typeof body === 'object') {
+                for (const [k,v] of Object.entries(body)) { if (v != null) qp.set(k, String(v)); }
+            }
+            const url = qp.toString() ? `${base}?${qp.toString()}` : base;
+            const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+            const txt = await res.text();
+            if (!res.ok) throw new Error(`Status ${res.status} ${txt.slice(0,200)}`);
+            return JSON.parse(txt);
+        } catch (fallbackErr: any) {
+            throw new Error(`Error de red al invocar la función '${functionName}'. Verifique CORS y disponibilidad. Detalle: ${fallbackErr?.message || 'sin detalle'}`);
+        }
+    }
+    throw new Error(`Error al invocar la función '${functionName}': ${error.message}`);
 };
 
 export const getComplianceAnalysis = async (query: string): Promise<AiComplianceResponse> => {
@@ -72,9 +113,10 @@ export const getComplianceAnalysis = async (query: string): Promise<AiCompliance
     } catch (primaryErr: any) {
         console.warn('Fallo invokeFunction, intentando fallback directo:', primaryErr?.message);
         try {
-            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-            const session = await supabase.auth.getSession();
-            const accessToken = session.data.session?.access_token;
+            const anonKey = (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY || (process as any)?.env?.VITE_SUPABASE_ANON_KEY || '';
+            let session: any = null;
+            try { session = await (supabase as any).auth?.getSession?.(); } catch { /* ignore in tests */ }
+            const accessToken = session?.data?.session?.access_token;
             // Derivar project ref desde supabaseUrl
             const supaUrl = (supabase as any).supabaseUrl || '';
             const match = supaUrl.match(/^https:\/\/([a-z0-9]{20})\.supabase\.co/);
@@ -117,21 +159,18 @@ export const getComplianceAnalysis = async (query: string): Promise<AiCompliance
     }
 };
 
-export const getSubTaskSuggestions = async (obligation: string, category: string): Promise<string[]> => {
-    const response = await invokeFunction('suggest-subtasks', { obligation, category });
-    if (response && Array.isArray(response.subTasks)) {
-        return response.subTasks;
-    }
-    console.warn("Suggest-subtasks function returned a response without a 'subTasks' array.", response);
-    return [];
-};
 
 export const getAuditPlanSuggestion = async (description: string): Promise<AiAuditPlanSuggestion> => {
-    const response = await invokeFunction('suggest-audit-plan', { description });
-    if (!response || typeof response !== 'object' || !('plan' in response)) {
+    const response: any = await invokeFunction('suggest-audit-plan', { description });
+    const candidate = response?.plan || response?.data || response;
+    if (!candidate || typeof candidate !== 'object' || !candidate.name) {
         throw new Error("Respuesta inválida de suggest-audit-plan");
     }
-    return response as AiAuditPlanSuggestion;
+    return {
+        name: candidate.name,
+        scope_level: candidate.scope_level || candidate.scopeLevel || 'General',
+        scope_entity: candidate.scope_entity || candidate.scopeEntity || ''
+    } as AiAuditPlanSuggestion;
 };
 
 export const generateReport = async (

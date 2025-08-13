@@ -25,7 +25,7 @@ export interface CommentRow {
   author_name: string;
   created_at: string;
   id: number;
-  sub_task_id: number;
+  sub_task_id: string; // uuid of sub_tasks.id
   text: string;
 };
 
@@ -34,7 +34,7 @@ export interface DocumentRow {
   id: number;
   name: string;
   storage_path: string;
-  sub_task_id: number;
+  sub_task_id: string; // uuid of sub_tasks.id
   url: string;
 };
 
@@ -55,7 +55,7 @@ export interface SubTaskRow {
   assigned_to_id: string | null;
   created_at: string;
   description: string;
-  id: number;
+  id: string; // uuid
   status: TaskStatus;
   task_id: string; // Changed from number to string for UUID
 };
@@ -146,13 +146,13 @@ export type Database = {
           author_name: string;
           created_at?: string;
           id?: number;
-          sub_task_id: number;
+          sub_task_id: string; // uuid
           text: string;
         };
         Update: {
           author_id?: string;
           author_name?: string;
-          sub_task_id?: number;
+          sub_task_id?: string; // uuid
           text?: string;
         };
         Relationships: [];
@@ -164,13 +164,13 @@ export type Database = {
           id?: number;
           name: string;
           storage_path: string;
-          sub_task_id: number;
+          sub_task_id: string; // uuid
           url: string;
         };
         Update: {
           name?: string;
           storage_path?: string;
-          sub_task_id?: number;
+          sub_task_id?: string; // uuid
           url?: string;
         };
         Relationships: [];
@@ -205,7 +205,7 @@ export type Database = {
           assigned_to_id?: string | null;
           created_at?: string;
           description: string;
-          id?: number;
+          id?: string; // uuid
           status?: TaskStatus;
           task_id: string; // Changed from number
         };
@@ -394,7 +394,7 @@ export type TaskComment = CommentRow;
 // we create truly flat composite types that prevent recursive loops in the TS compiler.
 
 export interface SubTask {
-  id: number;
+  id: string; // uuid
   task_id: string;
   description: string;
   status: TaskStatus;

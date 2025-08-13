@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Audit, AuditFinding, Profile, Database } from '../types';
+import { Audit, AuditFinding, Database } from '../types';
 import FindingItem from './FindingItem';
 import PlusCircleIcon from './icons/PlusCircleIcon';
 import BuildingOfficeIcon from './icons/BuildingOfficeIcon';

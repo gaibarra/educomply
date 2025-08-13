@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { supabase } from '../services/supabaseClient';
-import { AuditFinding, FindingSeverity, FindingStatus, Profile, Database } from '../types';
+import { AuditFinding, FindingSeverity, FindingStatus, Database } from '../types';
 import FlagIcon from './icons/FlagIcon';
 import TrashIcon from './icons/TrashIcon';
 
@@ -42,7 +42,7 @@ const FindingItem: React.FC<FindingItemProps> = ({ finding, onUpdate, onDelete }
     };
     
     const inputClasses = "w-full p-2 bg-slate-50 border border-slate-300 rounded-md text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-secondary focus:border-transparent";
-    const selectClasses = "p-1 -ml-1 border border-transparent rounded-md text-slate-600 bg-transparent hover:bg-slate-100 hover:border-slate-200 focus:ring-1 focus:ring-brand-secondary focus:bg-white";
+    // Removed unused selectClasses constant
 
 
     return (

@@ -135,12 +135,12 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
             const commentsBySubTaskId = (typedCommentsData || []).reduce((acc, comment) => {
                 (acc[comment.sub_task_id] = acc[comment.sub_task_id] || []).push(comment);
                 return acc;
-            }, {} as Record<number, TaskComment[]>);
+            }, {} as Record<string, TaskComment[]>);
 
             const documentsBySubTaskId = (typedDocumentsData || []).reduce((acc, doc) => {
                 (acc[doc.sub_task_id] = acc[doc.sub_task_id] || []).push(doc);
                 return acc;
-            }, {} as Record<number, AttachedDocument[]>);
+            }, {} as Record<string, AttachedDocument[]>);
 
             const personsById = new Map((typedPersonsData || []).map(p => [p.id, p]));
             const areasById = new Map((typedAreasData || []).map(a => [a.id, a]));

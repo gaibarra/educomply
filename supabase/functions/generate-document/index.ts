@@ -12,9 +12,7 @@ const levelOrder: Record<string, number> = { debug:10, info:20, warn:30, error:4
 const currentLevel = levelOrder[LOG_LEVEL] ?? 20;
 const log = (lvl: keyof typeof levelOrder, ...a:any[]) => { if (currentLevel <= levelOrder[lvl]) console.log(`[${lvl.toUpperCase()}]`, ...a); };
 
-const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') || '*';
-import { buildCorsHeaders } from "../_shared/cors.ts";
-const corsHeaders = buildCorsHeaders({ 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
+import { buildCorsHeadersForRequest } from "../_shared/cors.ts";
 
 interface GenDocRequest {
   docName: string;
@@ -29,6 +27,7 @@ function decodeJwt(token:string){
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = buildCorsHeadersForRequest(req, { 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
   if (req.method === 'OPTIONS') {
     log('debug','[generate-document] Preflight OPTIONS recibido');
     return new Response('ok',{headers:corsHeaders});

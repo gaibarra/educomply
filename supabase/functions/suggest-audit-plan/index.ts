@@ -3,8 +3,7 @@ declare const Deno: any;
 import { GoogleGenerativeAI } from "npm:@google/generative-ai";
 
 // Standard CORS headers for all responses
-import { buildCorsHeaders } from "../_shared/cors.ts";
-const corsHeaders = buildCorsHeaders({ 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
+import { buildCorsHeadersForRequest } from "../_shared/cors.ts";
 
 // Define the expected JSON schema for the response from Gemini
 const responseSchema = {
@@ -18,9 +17,10 @@ const responseSchema = {
 };
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = buildCorsHeadersForRequest(req, { 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
   // Handle CORS preflight requests immediately
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { status: 200, headers: corsHeaders });
   }
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Use POST' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -50,11 +50,31 @@ Deno.serve(async (req: Request) => {
     const result = await model.generateContent(prompt);
     const text = await result.response.text();
 
-    // Return the successful response from Gemini
-    return new Response(text, {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    // Try to parse AI output and normalize shape
+    const tryParse = (raw: string) => {
+      try { return JSON.parse(raw); } catch { const m = raw.match(/\{[\s\S]*\}/); if (m) { try { return JSON.parse(m[0]); } catch { /* ignore */ } } return null; }
+    };
+    const raw = tryParse(text);
+    // Accept shapes like { name, scope_level, scope_entity } or { plan: { ... } } or { data: { ... } }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const extract = (obj: any) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const candidate = obj.plan || obj.data || obj;
+      const name = candidate?.name;
+      const scope_level = candidate?.scope_level || candidate?.scopeLevel || 'General';
+      const scope_entity = candidate?.scope_entity || candidate?.scopeEntity || '';
+      if (typeof name === 'string' && typeof scope_level === 'string') {
+        return { name, scope_level, scope_entity: typeof scope_entity === 'string' ? scope_entity : '' };
+      }
+      return null;
+    };
+    const normalized = extract(raw);
+    if (!normalized) {
+      // Return a 200 with a minimal suggestion to avoid hard failures in UI, but mark as uncertain
+      const fallback = { name: (typeof text === 'string' && text.slice(0,80)) || 'Auditoría', scope_level: 'General', scope_entity: '' };
+      return new Response(JSON.stringify(fallback), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    }
+    return new Response(JSON.stringify(normalized), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
     // Generic error handler for any failure in the try block
@@ -64,12 +84,6 @@ Deno.serve(async (req: Request) => {
     
     console.error(`Function error in 'suggest-audit-plan' (Status: ${status}):`, errorMessage, error);
 
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+  return new Response(JSON.stringify({ error: errorMessage }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

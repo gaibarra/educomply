@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSubTaskSuggestions } from '../services/geminiService';
+import { getSubTaskSuggestions } from '../services/subtasksService';
 import SparklesIcon from './icons/SparklesIcon';
 
 interface SubTaskSuggestionModalProps {

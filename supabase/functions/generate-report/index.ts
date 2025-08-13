@@ -2,18 +2,18 @@
 declare const Deno: any;
 
 import { GoogleGenerativeAI } from "npm:@google/generative-ai";
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'npm:@supabase/supabase-js';
 
 const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') || '*';
-import { buildCorsHeaders } from "../_shared/cors.ts";
-const corsHeaders = buildCorsHeaders({ 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
+import { buildCorsHeadersForRequest } from "../_shared/cors.ts";
 
 // Function to get Supabase client
 const getSupabaseClient = (req) => {
+    const auth = req.headers.get('authorization') || req.headers.get('Authorization') || '';
     return createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+        { global: { headers: { Authorization: auth } } }
     );
 };
 
@@ -275,17 +275,15 @@ const handleWorkloadByPersonReport = async (supabase) => {
 
 // --- MAIN HANDLER ---
 Deno.serve(async (req) => {
+    const corsHeaders = buildCorsHeadersForRequest(req, { 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
     if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
+        return new Response('ok', { status: 200, headers: corsHeaders });
     }
     if (req.method !== 'POST') {
         return new Response(JSON.stringify({ error: 'Use POST' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     try {
-        const apiKey = Deno.env.get('GEMINI_API_KEY');
-        if (!apiKey) throw new Error('GEMINI_API_KEY no configurada.');
-
         const { query, reportType } = await req.json();
         const supabase = getSupabaseClient(req);
 
@@ -328,7 +326,14 @@ Deno.serve(async (req) => {
             });
         }
 
-    const ai = new GoogleGenerativeAI(apiKey);
+        const apiKey = Deno.env.get('GEMINI_API_KEY');
+        if (!apiKey) {
+            return new Response(JSON.stringify({ error: 'GEMINI_API_KEY no configurada.' }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+        const ai = new GoogleGenerativeAI(apiKey);
 
         // Step 1: Fetch relevant data from DB
         const [
@@ -342,8 +347,19 @@ Deno.serve(async (req) => {
         ]);
 
         if (tasksError || auditsError || profilesError) {
-            console.error('DB fetch errors:', { tasksError, auditsError, profilesError });
-            throw new Error('Falló la obtención de datos para generar el reporte.');
+            const errPayload: any = {
+                error: 'Falló la obtención de datos para generar el reporte.',
+                details: {
+                    tasksError: tasksError?.message || null,
+                    auditsError: auditsError?.message || null,
+                    profilesError: profilesError?.message || null,
+                }
+            };
+            console.error('DB fetch errors:', errPayload.details);
+            return new Response(JSON.stringify(errPayload), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
         }
 
         const dataContext = {
@@ -371,7 +387,7 @@ Genera el reporte en Markdown ahora. El reporte debe responder directamente a la
     const reportContent = await result.response.text();
         const reportTitle = `Reporte de IA: ${query.substring(0, 50)}...`;
 
-        return new Response(JSON.stringify({ title: reportTitle, content: reportContent }), {
+            return new Response(JSON.stringify({ title: reportTitle, content: reportContent }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
         });

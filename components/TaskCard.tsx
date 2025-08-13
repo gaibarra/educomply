@@ -115,7 +115,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
         onUpdateTask(updatedTask);
     };
 
-    const handleDeleteSubTask = async (subTaskId: number) => {
+    const handleDeleteSubTask = async (subTaskId: string) => {
         if (confirm('¿Está seguro de que desea eliminar esta sub-tarea?')) {
             const { error } = await supabase.from('sub_tasks').delete().eq('id', subTaskId);
             if (error) {
