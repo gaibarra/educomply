@@ -44,4 +44,14 @@ describe('getComplianceAnalysis', () => {
     const result = await getComplianceAnalysis('query');
     expect(result.summary).toBe('fallback');
   });
+
+  it('passes temperature parameter', async () => {
+    (supabase.functions.invoke as any).mockResolvedValueOnce({ data: { query_analysis: { summary: 'temp-ok', obligations: [], recommendations: [] } }, error: null });
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) } as any);
+    const result = await getComplianceAnalysis('test', 0.75);
+    expect(result.summary).toBe('temp-ok');
+    const callArgs = (supabase.functions.invoke as any).mock.calls[0];
+    expect(callArgs[0]).toBe('analyze-compliance');
+    expect(callArgs[1].body.temperature).toBeCloseTo(0.75, 5);
+  });
 });

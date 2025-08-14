@@ -56,6 +56,41 @@ ALLOWED_ORIGIN=http://localhost:5173
 | generate-report      | Reportes agregados (estado general, tareas por área, etc.) |
 | tasks-crud           | CRUD básico de tareas (GET/POST/PATCH/DELETE) |
 
+## Funciones RPC (PostgreSQL) para Estado de Tareas
+Se incluyen funciones SQL (archivo `supabase/sql/functions_tasks.sql`) para operaciones rápidas de cambio de estado sin depender de lógica compleja en el cliente.
+
+| Función | Parámetros | Acción | Notas |
+|---------|------------|--------|-------|
+| `mark_task_completed(p_task_id uuid)` | `p_task_id` id de la tarea | Marca todas las sub_tareas como `Completada`; si no existen crea una sub_tarea marcador | `SECURITY DEFINER`, otorgar EXECUTE a `authenticated` y `service_role` |
+| `reopen_task(p_task_id uuid)` | `p_task_id` | Cambia sub_tareas a `Pendiente` | Similar patrón de permisos |
+
+Estrategia de fallback en frontend (`ComplianceItemCard`):
+1. Intenta `supabase.rpc('mark_task_completed', { task_id })` o `reopen_task`.
+2. Si la función no existe (404 / Not Found), el componente:
+	- Marca directamente las filas de `sub_tasks` (o inserta una nueva al completar).
+	- Emite evento `task-status-changed` para refrescar Gantt y Dashboard.
+3. Muestra toasts de éxito/error y ofrece undo vía acción en toast.
+
+Para eliminar el fallback (cuando las funciones ya están desplegadas y probadas) puedes limpiar la rama de código que detecta 404. Mientras tanto garantiza resiliencia en entornos donde la migración SQL aún no se aplicó.
+
+Pasos para desplegar las funciones:
+```sql
+-- Ejecutar en panel SQL de Supabase
+\i supabase/sql/functions_tasks.sql
+```
+Verifica después con:
+```sql
+select proname from pg_proc where proname in ('mark_task_completed','reopen_task');
+```
+
+Si recibes `permission denied for function ...` añade:
+```sql
+grant execute on function public.mark_task_completed(uuid) to authenticated;
+grant execute on function public.reopen_task(uuid) to authenticated;
+```
+
+Recomendado: revisar políticas RLS de `sub_tasks` / `tasks` para que la ejecución vía funciones (SECURITY DEFINER) sea segura y no exponga datos no relacionados al usuario.
+
 ## CORS Centralizado
 `supabase/functions/_shared/cors.ts` expone `buildCorsHeaders()`. Ajustar `ALLOWED_ORIGIN` para producción segura.
 

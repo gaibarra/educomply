@@ -16,6 +16,7 @@ import DocumentTextIcon from './icons/DocumentTextIcon';
 import DownloadIcon from './icons/DownloadIcon';
 import SubTaskSuggestionModal from './SubTaskSuggestionModal';
 import BuildingOfficeIcon from './icons/BuildingOfficeIcon';
+import { useToast } from './ToastProvider';
 
 interface TaskCardProps {
     task: Task;
@@ -60,6 +61,7 @@ const getTaskStatus = (task: Task): TaskOverallStatus => {
 const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMembers, currentUserProfile }) => {
     const [isExpanded, setIsExpanded] = useState(true);
     const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
+    const toast = useToast();
 
     const handleAddSubTask = () => {
         if (task.subTasks.length === 0) {
@@ -192,10 +194,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
     const status = getTaskStatus(task);
     
     const statusClasses: Record<TaskOverallStatus, string> = {
-        'Atrasada': 'bg-red-100 text-red-800',
-        'Completada': 'bg-green-100 text-green-800',
-        'En Progreso': 'bg-blue-100 text-blue-800',
-        'Pendiente': 'bg-yellow-100 text-yellow-800',
+        'Atrasada': 'state-gradient-error text-white shadow-sm',
+        'Completada': 'state-gradient-task text-white shadow-sm',
+        'En Progreso': 'state-gradient-subtask text-white shadow-sm',
+        'Pendiente': 'bg-yellow-400/90 text-slate-900 shadow-sm',
     };
     
     const taskCategory = (task.scope as TaskScope)?.category ?? 'General';
@@ -203,72 +205,139 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
 
     return (
         <>
-        <div className="bg-white rounded-xl shadow-lg transition-all duration-300">
-            <div className="p-5 border-b border-slate-200 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="glass rounded-xl shadow-xl transition-all duration-300 hover-3d">
+            <div className="p-5 border-b border-white/10 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
                 <div className="flex justify-between items-start gap-4">
                     <div className="flex-1">
                          <div className="flex items-center gap-3 flex-wrap">
-                            <span className="bg-brand-secondary/10 text-brand-secondary text-xs font-bold px-2 py-1 rounded-full">{taskCategory}</span>
+                            <span className="text-xs font-bold px-2 py-1 rounded-full text-white state-gradient-project">{taskCategory}</span>
                             <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusClasses[status]}`}>
                                 {status}
                             </span>
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 mt-2">{task.description}</h3>
-                         <div className="flex items-center gap-4 flex-wrap text-sm text-slate-500 mt-1">
+                        <h3 className="text-xl font-extrabold text-slate-100 mt-2">{task.description}</h3>
+                         <div className="flex items-center gap-4 flex-wrap text-sm text-slate-300 mt-1">
                             <span>Fuente: {task.scope?.source ?? 'No especificada'}</span>
                             {task.scope && task.scope.level !== 'Institución' && (
-                                <div className="flex items-center gap-1.5 text-brand-primary font-medium bg-brand-secondary/10 px-2 py-0.5 rounded-full">
+                                <div className="flex items-center gap-1.5 text-white font-medium state-gradient-subtask px-2 py-0.5 rounded-full">
                                     <BuildingOfficeIcon className="w-4 h-4"/>
                                     <span>{task.scope.level}: {task.scope.entity}</span>
                                 </div>
                             )}
                         </div>
                     </div>
-                     <button className="text-slate-400 hover:text-brand-primary p-2">
+                     <button className="text-slate-300 hover:text-primary p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                     </button>
                 </div>
-                <div className="flex justify-between items-center mt-4">
-                    <div>
-                        <p className="text-sm font-semibold text-slate-600">Responsable Principal:</p>
-                        <p className="text-slate-800 font-medium">{task.responsible_person?.full_name || 'No asignado'}</p>
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mt-4">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-300">Responsable Principal</p>
+                            <p className="text-slate-100 font-medium">{task.responsible_person?.full_name || 'No asignado'}</p>
+                        </div>
+                        {status === 'Completada' && (task.completed_by || task.completed_at) && (
+                            <div>
+                                <p className="text-sm font-semibold text-emerald-300 flex items-center gap-1">Marcada como cumplida</p>
+                                <p className="text-emerald-200 text-sm">
+                                    {task.completed_by_profile?.full_name || 'Usuario desconocido'}{task.completed_at ? ' · ' + new Date(task.completed_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : ''}
+                                </p>
+                            </div>
+                        )}
                     </div>
-                     <div>
-                        <p className="text-sm font-semibold text-slate-600 text-right">Fecha Límite:</p>
-                        <p className={`font-bold ${status === 'Atrasada' ? 'text-status-danger' : 'text-slate-800'}`}>
-                           {dueDateString ? new Date(dueDateString + 'T00:00:00').toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }) : 'No definida'}
+                    <div className="text-right">
+                        <p className="text-sm font-semibold text-slate-300">Fecha Límite</p>
+                        <p className={`font-bold ${status === 'Atrasada' ? 'text-status-danger' : 'text-slate-100'}`}>
+                            {dueDateString ? new Date(dueDateString + 'T00:00:00').toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }) : 'No definida'}
                         </p>
                     </div>
                 </div>
                  <div className="mt-4">
                     <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-slate-600">Progreso</span>
-                        <span className="text-sm font-bold text-brand-secondary">{Math.round(progress)}%</span>
+                        <span className="text-sm font-medium text-slate-300">Progreso</span>
+                        <span className="text-sm font-bold text-slate-100">{Math.round(progress)}%</span>
                     </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2.5">
-                        <div className={`h-2.5 rounded-full transition-all duration-500 ${progress === 100 ? 'bg-status-success' : 'bg-brand-secondary'}`} style={{ width: `${progress}%` }}></div>
+                    <div className="w-full bg-white/10 rounded-full h-2.5">
+                        <div className={`h-2.5 rounded-full transition-all duration-500 ${progress === 100 ? 'bg-status-success' : 'state-gradient-subtask'}`} style={{ width: `${progress}%` }}></div>
                     </div>
                 </div>
             </div>
             
             {isExpanded && (
                 <div className="p-5 animate-fade-in space-y-5">
+                    {/* Quick completion panel for tasks without subtasks */}
+                    {task.subTasks.length === 0 && (
+                        <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4 flex flex-col gap-3">
+                            <p className="text-sm text-emerald-200">Esta tarea no tiene sub-tareas. Puedes marcarla directamente como cumplida o agregar un plan de acción.</p>
+                            <div className="flex flex-wrap gap-3">
+                                {status !== 'Completada' && (
+                                    <button
+                                        onClick={async ()=> {
+                                            try {
+                                                // Intentar RPC (creará sub_tarea genérica si no existen)
+                                                const { error } = await supabase.rpc('mark_task_completed', { p_task_id: task.id });
+                                                if (error) throw error;
+                                            } catch (e:any) {
+                                                // Fallback: crear sub_tarea manualmente
+                                                try {
+                                                    await supabase.from('sub_tasks').insert({ task_id: task.id, title: 'Marcado como cumplido', status: 'Completada' } as any);
+                                                } catch (fbErr:any) {
+                                                    toast.addToast('error', 'No se pudo marcar como cumplida: ' + (fbErr?.message||'Error'), 6000);
+                                                    return;
+                                                }
+                                            }
+                                            // Refrescar subtareas locales
+                                            const { data: freshSubs } = await supabase.from('sub_tasks').select('*').eq('task_id', task.id);
+                                            const enriched = (freshSubs||[]).map(st => ({ ...st, comments: [], documents: [], assigned_to: null })) as unknown as SubTask[];
+                                            onUpdateTask({ ...task, subTasks: enriched });
+                                            toast.addToast('success', 'Tarea marcada como cumplida', 4000, { label: 'Reabrir', onClick: async () => {
+                                                try { await supabase.rpc('reopen_task', { p_task_id: task.id }); } catch { await supabase.from('sub_tasks').update({ status: 'Pendiente' }).eq('task_id', task.id); }
+                                                const { data: subs2 } = await supabase.from('sub_tasks').select('*').eq('task_id', task.id);
+                                                const enriched2 = (subs2||[]).map(st => ({ ...st, comments: [], documents: [], assigned_to: null })) as unknown as SubTask[];
+                                                onUpdateTask({ ...task, subTasks: enriched2 });
+                                                toast.addToast('info', 'Tarea reabierta', 4000);
+                                            }});
+                                            try { window.dispatchEvent(new CustomEvent('task-status-changed', { detail: { taskId: task.id, newStatus: 'Completada' }})); } catch { /* ignore */ }
+                                        }}
+                                        className="px-4 py-2 rounded-md text-sm font-semibold text-white shadow-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-90 transition"
+                                    >Marcar tarea como cumplida</button>
+                                )}
+                                {status === 'Completada' && (
+                                    <button
+                                        onClick={async ()=> {
+                                            try { await supabase.rpc('reopen_task', { p_task_id: task.id }); } catch { await supabase.from('sub_tasks').update({ status: 'Pendiente' }).eq('task_id', task.id); }
+                                            const { data: subs2 } = await supabase.from('sub_tasks').select('*').eq('task_id', task.id);
+                                            const enriched2 = (subs2||[]).map(st => ({ ...st, comments: [], documents: [], assigned_to: null })) as unknown as SubTask[];
+                                            onUpdateTask({ ...task, subTasks: enriched2 });
+                                            toast.addToast('info', 'Tarea reabierta', 4000);
+                                            try { window.dispatchEvent(new CustomEvent('task-status-changed', { detail: { taskId: task.id, newStatus: 'Reabierta' }})); } catch { /* ignore */ }
+                                        }}
+                                        className="px-4 py-2 rounded-md text-sm font-semibold text-slate-900 bg-amber-300 hover:bg-amber-400 transition"
+                                    >Reabrir tarea</button>
+                                )}
+                                <button
+                                    onClick={handleAddSubTask}
+                                    className="px-4 py-2 rounded-md text-sm font-semibold text-slate-100 bg-white/10 border border-white/20 hover:bg-white/20 transition"
+                                >Agregar sub-tareas</button>
+                            </div>
+                        </div>
+                    )}
                     {task.documents && task.documents.length > 0 && (
                         <div>
-                            <h4 className="text-lg font-semibold text-slate-700 mb-3 flex items-center gap-2.5">
-                                <DocumentTextIcon className="w-6 h-6 text-brand-secondary"/>
+                            <h4 className="text-lg font-semibold text-slate-100 mb-3 flex items-center gap-2.5">
+                                <DocumentTextIcon className="w-6 h-6 text-slate-200"/>
                                 Documentos Sugeridos
                             </h4>
                             <ul className="space-y-2 pl-2">
                                 {task.documents.map(doc => (
-                                    <li key={doc} className="flex items-center justify-between gap-3 p-2 bg-slate-50 rounded-md border border-slate-200/80">
+                                    <li key={doc} className="flex items-center justify-between gap-3 p-2 bg-white/5 rounded-md border border-white/10">
                                         <div className="flex items-center gap-3">
-                                            <DocumentTextIcon className="w-5 h-5 text-slate-500 shrink-0"/>
-                                            <span className="text-sm text-slate-700">{doc}</span>
+                                            <DocumentTextIcon className="w-5 h-5 text-slate-300 shrink-0"/>
+                                            <span className="text-sm text-slate-100">{doc}</span>
                                         </div>
                                         <button
                                             onClick={() => handleDownloadDocument(doc)}
-                                            className="p-1.5 rounded-full text-slate-500 hover:bg-slate-200 hover:text-brand-secondary transition-colors"
+                                            className="p-1.5 rounded-full text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
                                             aria-label={`Descargar ${doc}`}
                                         >
                                             <DownloadIcon className="w-4 h-4" />
@@ -280,28 +349,30 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                     )}
                     
                     <div>
-                        <h4 className="text-lg font-semibold text-slate-700 mb-3">Plan de Acción y Sub-tareas</h4>
-                        <div className="flex flex-col">
-                            {task.subTasks.map((subtask, index) => (
-                                <SubTaskItem 
-                                    key={subtask.id} 
-                                    subTask={subtask} 
-                                    onUpdate={handleUpdateSubTask}
-                                    onDelete={handleDeleteSubTask}
-                                    availableTeamMembers={availableTeamMembers}
-                                    isLastItem={index === task.subTasks.length - 1}
-                                    currentUserProfile={currentUserProfile}
-                                />
-                            ))}
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-slate-200/80">
-                            <button 
-                                onClick={handleAddSubTask}
-                                className="flex items-center gap-2 text-sm font-semibold text-brand-secondary hover:text-brand-primary transition-colors"
-                            >
-                                <PlusCircleIcon className="w-5 h-5"/>
-                                Agregar Sub-tarea
-                            </button>
+                        <h4 className="text-lg font-semibold text-slate-100 mb-3">Plan de Acción y Sub-tareas</h4>
+                        <div className="rounded-lg border bg-sky-400/10 border-sky-400/20 p-3">
+                            <div className="flex flex-col">
+                                {task.subTasks.map((subtask, index) => (
+                                    <SubTaskItem 
+                                        key={subtask.id} 
+                                        subTask={subtask} 
+                                        onUpdate={handleUpdateSubTask}
+                                        onDelete={handleDeleteSubTask}
+                                        availableTeamMembers={availableTeamMembers}
+                                        isLastItem={index === task.subTasks.length - 1}
+                                        currentUserProfile={currentUserProfile}
+                                    />
+                                ))}
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-white/10">
+                                <button 
+                                    onClick={handleAddSubTask}
+                                    className="flex items-center gap-2 text-sm font-semibold text-slate-100 hover:text-white transition-colors"
+                                >
+                                    <PlusCircleIcon className="w-5 h-5"/>
+                                    Agregar Sub-tarea
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

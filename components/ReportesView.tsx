@@ -93,11 +93,11 @@ const ReportesView: React.FC<{ profile: Profile }> = ({ profile }) => {
     return (
         <>
             <div className="p-6 md:p-8">
-                <h2 className="text-3xl font-bold text-slate-800 mb-2">Generación de Reportes</h2>
-                <p className="text-slate-500 mb-8">Obtenga vistas detalladas y resúmenes inteligentes sobre el estado de su cumplimiento.</p>
+                <h2 className="text-3xl font-extrabold text-gradient mb-2">Generación de Reportes</h2>
+                <p className="text-slate-200/80 mb-8">Obtenga vistas detalladas y resúmenes inteligentes sobre el estado de su cumplimiento.</p>
 
-                <div className="bg-white p-6 rounded-xl shadow-lg mb-8 border border-slate-200">
-                    <h3 className="text-2xl font-bold text-slate-800 mb-5">Reportes Predefinidos</h3>
+                <div className="glass p-6 rounded-xl shadow-lg mb-8 border border-white/10">
+                    <h3 className="text-2xl font-extrabold text-gradient mb-5">Reportes Predefinidos</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {predefinedReports.map(report => (
                             <ReportCard
@@ -112,18 +112,18 @@ const ReportesView: React.FC<{ profile: Profile }> = ({ profile }) => {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                <div className="glass p-6 rounded-xl shadow-lg border border-white/10">
                      <div className="flex items-center gap-3 mb-4">
-                        <SparklesIcon className="w-8 h-8 text-yellow-500" />
-                        <h3 className="text-2xl font-bold text-slate-800">Reporte Personalizado con IA</h3>
+                        <SparklesIcon className="w-8 h-8 text-yellow-400" />
+                        <h3 className="text-2xl font-extrabold text-gradient">Reporte Personalizado con IA</h3>
                     </div>
-                    <p className="text-sm text-slate-500 mb-4">
+                    <p className="text-sm text-slate-200/80 mb-4">
                         Describa en lenguaje natural el reporte que necesita. La IA analizará los datos y lo generará por usted.
                     </p>
                     <textarea
                         value={aiQuery}
                         onChange={(e) => setAiQuery(e.target.value)}
-                        className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-secondary focus:border-transparent transition min-h-[100px] resize-y"
+                        className="w-full p-3 border border-white/10 bg-white/5 text-slate-100 placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition min-h-[100px] resize-y"
                         placeholder='Ej: "Genera un reporte ejecutivo que resuma el estado de cumplimiento del Campus Norte para el último trimestre, destacando los riesgos principales y las tareas asignadas a Juan Pérez."'
                         disabled={loadingReport === 'ai'}
                     />
@@ -131,7 +131,8 @@ const ReportesView: React.FC<{ profile: Profile }> = ({ profile }) => {
                         <button
                             onClick={() => handleGenerateReport({ type: 'ai', query: aiQuery })}
                             disabled={loadingReport === 'ai' || !aiQuery.trim()}
-                            className="inline-flex items-center justify-center gap-2 px-6 py-3 text-base font-bold text-white bg-brand-primary rounded-lg hover:bg-brand-secondary transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-400/50 disabled:bg-slate-400 disabled:cursor-not-allowed"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 text-base font-bold text-white rounded-lg transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-400/30 disabled:bg-slate-500/50 disabled:cursor-not-allowed"
+                            style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)'}}
                         >
                             {loadingReport === 'ai' ? (
                                 <>

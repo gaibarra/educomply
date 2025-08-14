@@ -5,6 +5,57 @@
 /* Custom theme extensions (mirroring previous CDN config) */
 @layer base {
   :root {
-    /* You can add CSS variables here if needed */
+    /* HSL color system for dynamic theming */
+    --background: 222.2 84% 4.9%; /* near-black */
+    --foreground: 210 40% 98%; /* near-white */
+    --primary: 217.2 91.2% 59.8%; /* vibrant blue */
+    --secondary: 217.2 32.6% 17.5%; /* blue-gray */
+    --muted: 217.2 32.6% 17.5%;
+    --destructive: 0 62.8% 30.6%; /* intense red */
   }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    /* Stellar deep gradient background */
+    background: linear-gradient(135deg, #0f172a, #1e293b, #334155, #475569, #64748b);
+    color: hsl(var(--foreground));
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+    background-attachment: fixed;
+    background-size: 200% 200%;
+  }
+  }
+
+/* Inter font se carga vía <link> en index.html (Google Fonts). Se elimina @font-face manual que causaba 404. */
+
+/* Utilities */
+@layer utilities {
+  .bg-app-gradient {
+    background: linear-gradient(135deg, #0f172a, #1e293b, #334155, #475569, #64748b);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4);
+    background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .glass {
+    background: rgb(15 23 42 / 50%);
+    border: 1px solid rgb(255 255 255 / 12%);
+    backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+
+  .hover-3d:hover {
+    transform: translateY(-4px) scale(1.02);
+  }
+  .state-gradient-task { background: linear-gradient(135deg, #22c55e, #16a34a); }
+  .state-gradient-subtask { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .state-gradient-error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+  .state-gradient-user { background: linear-gradient(135deg, #f97316, #ea580c); }
+  .state-gradient-project { background: linear-gradient(135deg, #64748b, #475569); }
 }

@@ -10,7 +10,11 @@ import TareasView from './components/TareasView';
 import AuditoriasView from './components/AuditoriasView';
 import ReportesView from './components/ReportesView';
 import InstitucionView from './components/InstitucionView';
+import ProyectosView from './components/ProyectosView';
+import UsersAdminView from './components/UsersAdminView';
+import GanttView from './components/GanttView';
 import Header from './components/Header';
+import { ToastProvider } from './components/ToastProvider';
 import Auth from './components/Auth';
 import ExclamationTriangleIcon from './components/icons/ExclamationTriangleIcon';
 
@@ -21,6 +25,37 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<View>('dashboard');
+  const [tareasInitialKeyword, setTareasInitialKeyword] = useState<string | null>(null);
+
+  // Allow deep-linking via URL params, e.g., ?view=tareas&q=palabra
+  useEffect(() => {
+    const applyFromLocation = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const viewParam = params.get('view');
+        const qParam = params.get('q');
+        if (qParam) setTareasInitialKeyword(qParam);
+        if (viewParam === 'tareas' || viewParam === 'gantt' || viewParam === 'dashboard') {
+          setActiveView(viewParam as View);
+        }
+      } catch { /* ignore */ }
+    };
+    applyFromLocation();
+    const onPop = () => applyFromLocation();
+    const navListener = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      if(detail.view) {
+        setActiveView(detail.view);
+        if(detail.q) setTareasInitialKeyword(detail.q);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('app:navigate', navListener as EventListener);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      window.removeEventListener('app:navigate', navListener as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     const getSession = async () => {
@@ -154,25 +189,52 @@ const App: React.FC = () => {
 
     switch (activeView) {
       case 'dashboard':
-        return <Dashboard profile={profile} setActiveView={setActiveView} />;
+        return <Dashboard profile={profile} setActiveView={setActiveView} institutionProfile={institutionProfile} />;
+      case 'gantt': {
+        const inferDefaultCode = (inst?: InstitutionProfileRow | null) => {
+          if (inst?.phone_country_code) return inst.phone_country_code;
+          try {
+            const parts: string[] = [];
+            if (inst?.name) parts.push(inst.name);
+            if (inst?.legal_representative) parts.push(inst.legal_representative);
+            (inst?.locations || []).forEach(l => parts.push(l.name || '', l.address || ''));
+            const text = parts.join(' ').toLowerCase();
+            if (text.includes('colombia')) return '+57';
+            if (text.includes('argentina')) return '+54';
+            if (text.includes('perú') || text.includes('peru')) return '+51';
+            if (text.includes('chile')) return '+56';
+            if (text.includes('ecuador')) return '+593';
+            if (text.includes('méxico') || text.includes('mexico')) return '+52';
+          } catch {
+            // ignore errors inferring country code
+          }
+          return '+52';
+        };
+        const phoneCountryCodeDefault = inferDefaultCode(institutionProfile);
+        return <GanttView profile={profile} setActiveView={setActiveView} setTaskSearchKeyword={setTareasInitialKeyword} phoneCountryCodeDefault={phoneCountryCodeDefault} />;
+      }
       case 'normativas':
         return <NormativasView profile={profile} setActiveView={setActiveView} institutionProfile={institutionProfile} />;
       case 'tareas':
-        return <TareasView profile={profile} />;
+        return <TareasView profile={profile} initialKeyword={tareasInitialKeyword ?? ''} />;
       case 'auditorias':
         return <AuditoriasView profile={profile} institutionProfile={institutionProfile} />;
       case 'reportes':
         return <ReportesView profile={profile} />;
       case 'institucion':
         return <InstitucionView profile={profile} institutionProfile={institutionProfile} onUpdate={handleInstitutionUpdate} />;
+      case 'proyectos':
+        return <ProyectosView profile={profile} />;
+      case 'usuarios':
+        return <UsersAdminView profile={profile} />;
       default:
-        return <Dashboard profile={profile} setActiveView={setActiveView} />;
+        return <Dashboard profile={profile} setActiveView={setActiveView} institutionProfile={institutionProfile} />;
     }
   };
 
   if (loading && !profile) {
      return (
-        <div className="flex justify-center items-center h-screen bg-slate-100">
+        <div className="flex justify-center items-center h-screen bg-transparent">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-brand-primary"></div>
         </div>
      );
@@ -183,15 +245,17 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-slate-100 font-sans">
-      <Sidebar activeView={activeView} setActiveView={setActiveView} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header session={session} profile={profile} institutionProfile={institutionProfile} />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-100">
-          {renderContent()}
-        </main>
+    <ToastProvider>
+      <div className="flex h-screen bg-transparent font-sans">
+        <Sidebar activeView={activeView} setActiveView={setActiveView} profile={profile} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header session={session} profile={profile} institutionProfile={institutionProfile} />
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent">
+            {renderContent()}
+          </main>
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   );
 };
 

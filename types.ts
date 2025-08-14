@@ -2,7 +2,7 @@
 
 import type { Session as SupabaseSession } from '@supabase/supabase-js';
 
-export type View = 'dashboard' | 'normativas' | 'tareas' | 'auditorias' | 'reportes' | 'institucion';
+export type View = 'dashboard' | 'normativas' | 'tareas' | 'auditorias' | 'reportes' | 'institucion' | 'proyectos' | 'usuarios' | 'gantt';
 export type Session = SupabaseSession;
 
 // Define common enums/unions first
@@ -44,6 +44,10 @@ export interface ProfileRow {
   id: string;
   role: "admin" | "director_campus" | "director_facultad" | "usuario";
   scope_entity: string | null;
+  mobile?: string | null; // numero movil
+  position?: string | null; // puesto
+  campus?: string | null; // localizacion - campus
+  area?: string | null; // localizacion - area
 };
 
 export interface ResponsibleAreaRow {
@@ -67,11 +71,21 @@ export interface TaskRow {
   id: string; // Changed from number to string for UUID
   responsible_area_id: number;
   responsible_person_id: string;
+  owner_id: string;
+  project_id: string | null;
   scope: TaskScope | null;
 };
 
 // --- Tipos para el Módulo de Auditorías ---
 export type AuditStatus = 'Planificada' | 'En Progreso' | 'Completada' | 'Cancelada';
+export type AuditPhaseKey = 'planificacion' | 'ejecucion' | 'evaluacion' | 'seguimiento';
+export interface AuditPhaseActivity { key: string; title: string; completed: boolean; notes?: string | null; }
+export interface AuditPhasesState {
+  planificacion?: { activities: AuditPhaseActivity[] };
+  ejecucion?: { activities: AuditPhaseActivity[] };
+  evaluacion?: { activities: AuditPhaseActivity[] };
+  seguimiento?: { activities: AuditPhaseActivity[] };
+}
 export type FindingSeverity = 'Crítico' | 'Mayor' | 'Menor' | 'Observación';
 export type FindingStatus = 'Abierto' | 'Cerrado';
 
@@ -96,6 +110,12 @@ export interface AuditRow {
   start_date: string;
   end_date: string;
   auditor_id: string; // uuid from profiles
+  project_id?: string | null; // uuid
+  ai_description?: string | null;
+  ai_raw_suggestion?: any | null;
+  current_phase?: AuditPhaseKey | null;
+  phase_activities?: AuditPhasesState | null;
+  phase_log?: { ts: string; from: AuditPhaseKey | null; to: AuditPhaseKey | null; actor?: string | null }[] | null;
 }
 
 export interface AuditTaskLinkRow {
@@ -128,10 +148,29 @@ export interface InstitutionProfileRow {
   name: string | null;
   legal_representative: string | null;
   logo_url: string | null;
+  phone_country_code?: string | null; // E.164 country calling code, e.g., +52
   locations: InstitutionLocation[];
   educational_levels: string[];
   authorities: InstitutionAuthority[];
   academic_programs: AcademicProgram[];
+}
+
+// --- Proyectos/Equipos ---
+export type ProjectRole = 'owner' | 'admin' | 'member' | 'viewer';
+
+export interface ProjectRow {
+  id: string; // uuid
+  name: string;
+  description: string | null;
+  owner_id: string; // profiles.id
+  created_at: string;
+}
+
+export interface ProjectMemberRow {
+  project_id: string; // uuid
+  user_id: string; // uuid
+  role: ProjectRole;
+  created_at: string;
 }
 
 
@@ -183,11 +222,19 @@ export type Database = {
           id: string;
           role: "admin" | "director_campus" | "director_facultad" | "usuario";
           scope_entity: string | null;
+          mobile?: string | null;
+          position?: string | null;
+          campus?: string | null;
+          area?: string | null;
         };
         Update: {
           full_name?: string;
           role?: "admin" | "director_campus" | "director_facultad" | "usuario";
           scope_entity?: string | null;
+          mobile?: string | null;
+          position?: string | null;
+          campus?: string | null;
+          area?: string | null;
         };
         Relationships: [];
       };
@@ -225,6 +272,8 @@ export type Database = {
           documents?: string[] | null;
           responsible_area_id: number;
           responsible_person_id: string;
+          owner_id?: string;
+          project_id?: string | null;
           scope?: TaskScope | null;
         };
         Update: {
@@ -232,6 +281,8 @@ export type Database = {
             documents?: string[] | null;
             responsible_area_id?: number;
             responsible_person_id?: string;
+            owner_id?: string;
+            project_id?: string | null;
             scope?: TaskScope | null;
         };
         Relationships: [];
@@ -246,6 +297,12 @@ export type Database = {
           start_date: string;
           end_date: string;
           auditor_id: string;
+          project_id?: string | null;
+          ai_description?: string | null;
+          ai_raw_suggestion?: any | null;
+          current_phase?: AuditPhaseKey | null;
+          phase_activities?: AuditPhasesState | null;
+          phase_log?: { ts: string; from: AuditPhaseKey | null; to: AuditPhaseKey | null; actor?: string | null }[] | null;
         };
         Update: {
           name?: string;
@@ -255,6 +312,12 @@ export type Database = {
           start_date?: string;
           end_date?: string;
           auditor_id?: string;
+          project_id?: string | null;
+          ai_description?: string | null;
+          ai_raw_suggestion?: any | null;
+          current_phase?: AuditPhaseKey | null;
+          phase_activities?: AuditPhasesState | null;
+          phase_log?: { ts: string; from: AuditPhaseKey | null; to: AuditPhaseKey | null; actor?: string | null }[] | null;
         };
         Relationships: [];
       };
@@ -293,6 +356,7 @@ export type Database = {
             name?: string | null;
             legal_representative?: string | null;
             logo_url?: string | null;
+            phone_country_code?: string | null;
             locations?: InstitutionLocation[];
             educational_levels?: string[];
             authorities?: InstitutionAuthority[];
@@ -302,13 +366,85 @@ export type Database = {
             name?: string | null;
             legal_representative?: string | null;
             logo_url?: string | null;
+            phone_country_code?: string | null;
             locations?: InstitutionLocation[];
             educational_levels?: string[];
             authorities?: InstitutionAuthority[];
             academic_programs?: AcademicProgram[];
           };
           Relationships: [];
-      }
+      };
+      projects: {
+        Row: ProjectRow;
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          owner_id?: string; // default to auth.uid() in DB; set explicitly from client if needed
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          description?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'projects_owner_id_fkey';
+            columns: ['owner_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      project_members: {
+        Row: ProjectMemberRow;
+        Insert: {
+          project_id: string;
+          user_id: string;
+          role?: ProjectRole; // default 'member'
+          created_at?: string;
+        };
+        Update: {
+          role?: ProjectRole;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'project_members_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'project_members_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      reminders: {
+        Row: {
+          id: string;
+          task_id: string;
+          user_id: string;
+          remind_at: string | null;
+          created_at: string;
+          meta: any | null;
+        };
+        Insert: {
+          id?: string;
+          task_id: string;
+          user_id?: string; // default auth.uid() en DB
+          remind_at?: string | null;
+          created_at?: string;
+          meta?: any | null;
+        };
+        Update: {
+          remind_at?: string | null;
+          meta?: any | null;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -333,6 +469,7 @@ export interface ComplianceObligation {
   authority: string;
   dueDate: string;
   status: 'Cumplido' | 'Pendiente' | 'Vencido';
+  rawDueISO?: string; // ISO (YYYY-MM-DD) para acciones (recordatorios, etc.)
 }
 
 export interface Kpi {
@@ -416,6 +553,10 @@ export interface Task {
   subTasks: SubTask[];
   responsible_area: { name: string } | null;
   responsible_person: SimpleProfile | null;
+  // Metadata de finalización (opcional hasta que se aplique migración SQL)
+  completed_by?: string | null;
+  completed_at?: string | null;
+  completed_by_profile?: SimpleProfile | null;
 }
 
 export type TaskFromDb = TaskRow;
@@ -447,6 +588,9 @@ export interface Audit {
     auditor_id: string; // uuid from profiles
     auditor: SimpleProfile | null;
     findings: AuditFinding[];
+  current_phase?: AuditPhaseKey | null;
+  phase_activities?: AuditPhasesState | null;
+  phase_log?: { ts: string; from: AuditPhaseKey | null; to: AuditPhaseKey | null; actor?: string | null }[] | null;
 }
 
 

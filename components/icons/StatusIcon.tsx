@@ -42,7 +42,7 @@ const StatusIcon: React.FC<StatusIconProps> = ({ status, onClick }) => {
     return (
         <button
             onClick={onClick}
-            className="relative flex-shrink-0 z-10 bg-white"
+            className="relative flex-shrink-0 z-10"
             aria-label={current.label}
         >
             <svg

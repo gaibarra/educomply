@@ -1,6 +1,7 @@
 
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import EnhancedSelect from './EnhancedSelect';
 import { supabase } from '../services/supabaseClient';
 import { Task, TaskOverallStatus, TaskFilters as TaskFiltersType, ScopeLevel, Profile, ResponsibleArea, SubTask, TaskScope, TaskComment, AttachedDocument, TaskFromDb, Database } from '../types';
 import TaskCard from './TaskCard';
@@ -40,20 +41,46 @@ const getTaskStatus = (task: Task): TaskOverallStatus => {
     return 'Pendiente';
 };
 
-const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
+const TareasView: React.FC<{ profile: Profile; initialKeyword?: string }> = ({ profile, initialKeyword = '' }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+    const [selectedProjectId, setSelectedProjectId] = useState<string | 'Todos'>('Todos');
     // Toggle sólo visible para admin: ver todas las tareas o sólo propias / asignadas
     const [showAllForAdmin, setShowAllForAdmin] = useState(false);
 
     const initialFilters: TaskFiltersType = {
-        keyword: '', category: 'Todos', responsibleArea: 'Todos',
+        keyword: initialKeyword || '', category: 'Todos', responsibleArea: 'Todos',
         responsiblePerson: 'Todos', status: 'Todos', dueDateStart: '',
         dueDateEnd: '', scopeLevel: 'Todos', scopeEntity: '',
     };
     
     const [filters, setFilters] = useState<TaskFiltersType>(initialFilters);
+    const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+    const hasFocusedRef = useRef(false);
+
+    // If initialKeyword changes (e.g., coming from Gantt), update filters once.
+    // Detect navigation source: if arrived via sidebar (no keyword param change), avoid auto scroll
+    const viaSidebarRef = useRef(false);
+    useEffect(()=>{
+        const listener = (e: Event) => {
+            const detail = (e as CustomEvent).detail || {};
+            if(detail.view === 'tareas' && !detail.q) {
+                viaSidebarRef.current = true;
+            }
+        };
+        window.addEventListener('app:navigate', listener as EventListener);
+        return ()=> window.removeEventListener('app:navigate', listener as EventListener);
+    },[]);
+    useEffect(() => {
+        if (initialKeyword) {
+            setFilters(prev => ({ ...prev, keyword: initialKeyword }));
+        }
+        // reset flag if keyword present
+        if(initialKeyword) viaSidebarRef.current = false;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialKeyword]);
     
     const [availableFilterOptions, setAvailableFilterOptions] = useState<{
         categories: string[];
@@ -69,8 +96,12 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
             // Step 1: Build the main task query based on filters
             let tasksQuery = supabase
                 .from('tasks')
-                .select(`id, created_at, description, scope, documents, responsible_area_id, responsible_person_id, owner_id`)
+                .select(`id, created_at, description, scope, documents, responsible_area_id, responsible_person_id, owner_id, project_id, completed_by, completed_at, completed_by_profile:completed_by ( id, full_name, role, scope_entity )`)
                 .order('scope->>due_date' as any, { ascending: true });
+
+            if (selectedProjectId !== 'Todos') {
+                tasksQuery = tasksQuery.eq('project_id', selectedProjectId);
+            }
 
             const restrictToUser = profile.role !== 'admin' || !showAllForAdmin; // si no es admin o admin con toggle apagado
             if (restrictToUser) {
@@ -163,6 +194,9 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
                 responsible_area: task.responsible_area_id ? areasById.get(task.responsible_area_id) || null : null,
                 responsible_person: task.responsible_person_id ? personsById.get(task.responsible_person_id) || null : null,
                 subTasks: subTasksByTaskId[task.id] || [],
+                completed_by: (task as any).completed_by || null,
+                completed_at: (task as any).completed_at || null,
+                completed_by_profile: (task as any).completed_by_profile || null,
             }));
     
             // Post-filter for computed status, as this can't be done in the DB query
@@ -182,11 +216,30 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
         } finally {
             setLoading(false);
         }
-    }, [filters, profile.id, profile.role, showAllForAdmin]);
+    }, [filters, profile.id, profile.role, showAllForAdmin, selectedProjectId]);
 
     useEffect(() => {
         fetchTasks();
     }, [fetchTasks]);
+
+    // After tasks load, if there's an initial keyword, scroll to the first matching task and highlight it briefly
+    useEffect(() => {
+        if (loading || error) return;
+        if (!initialKeyword || hasFocusedRef.current) return;
+        if (!tasks || tasks.length === 0) return;
+        if (viaSidebarRef.current) return; // skip auto scroll when opened from sidebar
+        const kw = initialKeyword.toLowerCase();
+        const match = tasks.find(t => (t.description || '').toLowerCase().includes(kw));
+        if (match) {
+            const el = document.getElementById(`task-${match.id}`);
+            if (el && typeof el.scrollIntoView === 'function') {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            setHighlightedTaskId(match.id);
+            setTimeout(() => setHighlightedTaskId(null), 2500);
+            hasFocusedRef.current = true;
+        }
+    }, [loading, error, tasks, initialKeyword]);
     
     useEffect(() => {
         // Fetch options for filters
@@ -195,16 +248,22 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
                 const [
                   { data: areasData, error: areasError },
                   { data: personsData, error: personsError },
-                  { data: tasksWithScopeData, error: categoriesError }
+                  { data: tasksWithScopeData, error: categoriesError },
+                  { data: projectsData, error: projectsError }
                 ] = await Promise.all([
                    supabase.from('responsible_areas').select('id, name').order('name'),
                    supabase.from('profiles').select('id, full_name, role, scope_entity').order('full_name'),
-                   supabase.from('tasks').select('scope')
+                   supabase.from('tasks').select('scope'),
+                   supabase.from('projects' as any).select('id, name').order('name')
                 ]);
 
                 if (areasError) throw areasError;
                 if (personsError) throw personsError;
                 if (categoriesError) throw categoriesError;
+                if (projectsError) {
+                    // If projects table not present or blocked by RLS, ignore silently
+                    console.warn('No se pudo cargar proyectos para filtro (opcional):', projectsError.message);
+                }
 
                 const typedAreasData = areasData as unknown as ResponsibleArea[];
                 const typedPersonsData = personsData as unknown as Profile[];
@@ -224,6 +283,8 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
                     persons: typedPersonsData || [],
                     categories: ['Todos', ...Array.from(categories).sort()]
                 }));
+
+                setProjects(((projectsData as any[]) || []).map(p => ({ id: p.id, name: p.name })));
             } catch (error) {
                  console.error("Error fetching filter options", error);
                  // Optionally set an error state for the UI
@@ -240,11 +301,11 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
     
     return (
         <div className="p-6 md:p-8">
-            <h2 className="text-3xl font-bold text-slate-800 mb-2">Gestión de Tareas</h2>
-            <p className="text-slate-500 mb-8">Supervise, delegue y comente el progreso de las obligaciones de cumplimiento.</p>
+            <h2 className="text-3xl font-extrabold text-gradient mb-2">Gestión de Tareas</h2>
+            <p className="text-slate-300 mb-6 max-w-3xl">Supervise, delegue y comente el progreso de las obligaciones de cumplimiento.</p>
 
             {profile.role === 'admin' && (
-                <div className="mb-4 flex items-center gap-2 bg-slate-50 rounded-lg px-4 py-2 border border-slate-200">
+                <div className="mb-5 flex items-center gap-2 bg-white/5 rounded-lg px-4 py-2 border border-white/10 backdrop-blur">
                     <input
                         id="toggleAllTasks"
                         type="checkbox"
@@ -252,7 +313,7 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
                         checked={showAllForAdmin}
                         onChange={e => setShowAllForAdmin(e.target.checked)}
                     />
-                    <label htmlFor="toggleAllTasks" className="text-sm text-slate-700 select-none">
+                    <label htmlFor="toggleAllTasks" className="text-sm text-slate-200 select-none">
                         Ver todas las tareas (Admin)
                     </label>
                     <span className="text-xs text-slate-400 ml-auto">
@@ -270,6 +331,22 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
                 availablePersons={availableFilterOptions.persons.map(p => ({ id: p.id, name: p.full_name }))}
                 availableScopeLevels={availableFilterOptions.scopeLevels}
             />
+            {projects.length > 0 && (
+                <div className="mb-6 flex items-center gap-2 bg-white/5 rounded-lg px-4 py-2 border border-white/10 backdrop-blur">
+                    <label className="text-sm text-slate-200 select-none">Proyecto:</label>
+                    <div className="w-64">
+                        <EnhancedSelect
+                            value={selectedProjectId === 'Todos' ? '' : selectedProjectId}
+                            onChange={(v)=> setSelectedProjectId((v || 'Todos') as any)}
+                            options={[{value:'',label:'Todos'}, ...projects.map(p=>({ value:p.id, label:p.name }))]}
+                            placeholder="Todos"
+                            searchable
+                            clearable
+                        />
+                    </div>
+                    <span className="text-xs text-slate-400 ml-auto">Filtro por proyecto (opcional)</span>
+                </div>
+            )}
             
             {loading && (
                 <div className="flex justify-center items-center p-8">
@@ -284,7 +361,7 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
             )}
             
             {!loading && !error && tasks.length === 0 && (
-                <div className="bg-white p-8 rounded-xl shadow-md text-center">
+                <div className="glass p-8 rounded-xl shadow-md text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
@@ -296,15 +373,20 @@ const TareasView: React.FC<{ profile: Profile }> = ({ profile }) => {
             )}
 
             {!loading && !error && tasks.length > 0 && (
-                <div className="space-y-6">
+                <div className="space-y-6 mt-6">
                     {tasks.map(task => (
-                        <TaskCard 
-                            key={task.id} 
-                            task={task} 
-                            onUpdateTask={handleUpdateTask} 
-                            availableTeamMembers={availableTeamMembers}
-                            currentUserProfile={profile}
-                        />
+                        <div
+                            key={task.id}
+                            id={`task-${task.id}`}
+                            className={highlightedTaskId === task.id ? 'rounded-xl ring-2 ring-cyan-400/70 bg-white/5 transition duration-500' : ''}
+                        >
+                            <TaskCard 
+                                task={task} 
+                                onUpdateTask={handleUpdateTask} 
+                                availableTeamMembers={availableTeamMembers}
+                                currentUserProfile={profile}
+                            />
+                        </div>
                     ))}
                 </div>
             )}

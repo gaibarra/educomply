@@ -1,15 +1,19 @@
-import React from 'react';
-import type { View } from '../types';
+import React, { useState } from 'react';
+import type { View, Profile } from '../types';
+import SupportContactModal from './SupportContactModal';
+import UserAdminIcon from './icons/UserAdminIcon';
 import DashboardIcon from './icons/DashboardIcon';
 import BookOpenIcon from './icons/BookOpenIcon';
 import ClipboardCheckIcon from './icons/ClipboardCheckIcon';
 import ShieldCheckIcon from './icons/ShieldCheckIcon';
 import ChartBarIcon from './icons/ChartBarIcon';
 import AcademicCapIcon from './icons/AcademicCapIcon';
+import BuildingOfficeIcon from './icons/BuildingOfficeIcon';
 
 interface SidebarProps {
   activeView: View;
   setActiveView: (view: View) => void;
+  profile?: Profile | null;
 }
 
 const NavItem: React.FC<{
@@ -21,23 +25,31 @@ const NavItem: React.FC<{
 }> = ({ view, label, activeView, onClick, children }) => (
   <li
     onClick={() => onClick(view)}
-    className={`flex items-center p-3 my-1 rounded-lg cursor-pointer transition-colors duration-200 ${
+    className={`flex items-center p-3 my-1 rounded-lg cursor-pointer transition-all duration-200 ${
       activeView === view
-        ? 'bg-brand-secondary text-white shadow-lg'
-        : 'text-slate-200 hover:bg-brand-secondary/50 hover:text-white'
+        ? 'text-white shadow-lg' 
+        : 'text-slate-200 hover:text-white'
     }`}
+    style={activeView === view ? { background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)' } : {}}
   >
     {children}
     <span className="ml-4 font-medium">{label}</span>
   </li>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, profile }) => {
+  const isAdmin = profile?.role === 'admin';
+  const [showSupport, setShowSupport] = useState(false);
   return (
-    <div className="w-64 bg-brand-primary text-white flex flex-col p-4 shadow-2xl">
+    <div
+      className="w-64 text-white flex flex-col p-4 shadow-2xl border-r border-white/10"
+      style={{
+        background: 'linear-gradient(180deg, #0b1e3a 0%, #0d2540 50%, #103255 100%)'
+      }}
+    >
       <div className="text-center py-4 mb-4">
-        <h1 className="text-2xl font-bold text-white">
-          Edu<span className="text-brand-accent">Comply</span>
+        <h1 className="text-2xl font-extrabold text-gradient">
+          EduComply
         </h1>
         <p className="text-xs text-slate-300">Gestión de Cumplimiento</p>
       </div>
@@ -45,6 +57,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
         <ul>
           <NavItem view="dashboard" label="Dashboard" activeView={activeView} onClick={setActiveView}>
             <DashboardIcon />
+          </NavItem>
+          {/* Proyectos movido debajo de Dashboard */}
+          <NavItem view="proyectos" label="Proyectos" activeView={activeView} onClick={setActiveView}>
+            <BuildingOfficeIcon />
           </NavItem>
           <NavItem view="normativas" label="Normativas" activeView={activeView} onClick={setActiveView}>
             <BookOpenIcon />
@@ -58,19 +74,25 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
           <NavItem view="reportes" label="Reportes" activeView={activeView} onClick={setActiveView}>
             <ChartBarIcon />
           </NavItem>
-          <div className="my-4 border-t border-brand-secondary/30"></div>
+          {isAdmin && (
+            <NavItem view="usuarios" label="Usuarios" activeView={activeView} onClick={setActiveView}>
+              <UserAdminIcon />
+            </NavItem>
+          )}
+      <div className="my-4 border-t border-white/10"></div>
           <NavItem view="institucion" label="Institución" activeView={activeView} onClick={setActiveView}>
             <AcademicCapIcon />
           </NavItem>
         </ul>
       </nav>
-      <div className="mt-auto bg-brand-secondary/50 p-4 rounded-lg text-center">
-         <p className="text-sm text-slate-200">¿Necesita ayuda?</p>
-         <p className="text-xs text-slate-300 mt-1">Contacte a soporte técnico para asistencia.</p>
-         <button className="mt-3 w-full bg-brand-accent text-brand-primary font-bold py-2 px-4 rounded-lg hover:bg-yellow-400 transition-colors">
-            Contactar
-         </button>
+    <div className="mt-auto bg-white/10 border border-white/10 p-4 rounded-lg text-center">
+      <p className="text-sm text-slate-200">¿Necesita ayuda?</p>
+      <p className="text-xs text-slate-300 mt-1">Contacte a soporte técnico para asistencia.</p>
+      <button onClick={() => setShowSupport(true)} className="mt-3 w-full text-white font-bold py-2 px-4 rounded-lg transition-colors" style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)'}}>
+        Contactar
+      </button>
       </div>
+      <SupportContactModal isOpen={showSupport} onClose={() => setShowSupport(false)} />
     </div>
   );
 };

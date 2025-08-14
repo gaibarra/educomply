@@ -19,13 +19,13 @@ const Arrow: React.FC<ArrowProps> = ({ type }) => {
 
 const KpiCard: React.FC<{ kpi: Kpi; icon: React.ReactNode }> = ({ kpi, icon }) => {
   return (
-    <div className="bg-white p-5 rounded-xl shadow-md flex items-start space-x-4 transition-transform hover:scale-105 duration-300">
-      <div className="bg-brand-secondary/10 p-3 rounded-full">
+  <div className="glass p-5 rounded-xl shadow-md flex items-start space-x-4 transition-transform hover:scale-105 duration-300 border border-white/10">
+      <div className="bg-white/10 p-3 rounded-full">
         {icon}
       </div>
       <div>
-        <p className="text-sm font-medium text-slate-500">{kpi.title}</p>
-        <p className="text-3xl font-bold text-slate-800">{kpi.value}</p>
+        <p className="text-sm font-medium text-slate-300">{kpi.title}</p>
+        <p className="text-3xl font-extrabold text-white">{kpi.value}</p>
         <div className="flex items-center mt-1 text-sm">
           <Arrow type={kpi.changeType} />
           <span className={`${kpi.changeType === 'increase' ? 'text-status-success' : 'text-status-danger'} font-semibold`}>

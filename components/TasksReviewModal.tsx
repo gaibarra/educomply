@@ -3,6 +3,7 @@
 
 
 import React, { useState, useEffect } from 'react';
+import EnhancedSelect from './EnhancedSelect';
 import { Task, ResponsibleArea, Profile, TaskFromDb, TaskScope } from '../types';
 import CalendarIcon from './icons/CalendarIcon';
 import DocumentTextIcon from './icons/DocumentTextIcon';
@@ -57,12 +58,7 @@ const TasksReviewModal: React.FC<TasksReviewModalProps> = ({ isOpen, onClose, on
     };
     
     const inputBaseStyles = "w-full p-2 bg-white border border-slate-300 rounded-md text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-secondary focus:border-transparent transition-colors duration-200";
-    const selectArrowStyle = {
-        backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%2364748b\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")',
-        backgroundPosition: 'right 0.5rem center',
-        backgroundRepeat: 'no-repeat',
-        backgroundSize: '1.5em 1.5em'
-    };
+    // selectArrowStyle removed (EnhancedSelect)
 
 
     return (
@@ -141,28 +137,26 @@ const TasksReviewModal: React.FC<TasksReviewModalProps> = ({ isOpen, onClose, on
                                     />
                                 </div>
                                 <div className="flex flex-col gap-1.5">
-                                    <label htmlFor={`area-${task.tempId}`} className="text-sm font-semibold text-slate-700">Área Responsable</label>
-                                    <select
-                                        id={`area-${task.tempId}`}
-                                        value={task.responsible_area_id ?? ''}
-                                        onChange={(e) => handleTaskChange(task.tempId, 'responsible_area_id', Number(e.target.value))}
-                                        className={`${inputBaseStyles} appearance-none`}
-                                        style={selectArrowStyle}
-                                    >
-                                        {availableAreas.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}
-                                    </select>
+                                    <label className="text-sm font-semibold text-slate-700">Área Responsable</label>
+                                    <EnhancedSelect
+                                        value={task.responsible_area_id ? String(task.responsible_area_id) : ''}
+                                        onChange={(v)=> handleTaskChange(task.tempId, 'responsible_area_id', v ? Number(v) : null)}
+                                        options={availableAreas.map(area=>({ value:String(area.id), label: area.name }))}
+                                        placeholder="Seleccionar área"
+                                        searchable
+                                        clearable
+                                    />
                                 </div>
                                 <div className="flex flex-col gap-1.5">
-                                    <label htmlFor={`person-${task.tempId}`} className="text-sm font-semibold text-slate-700">Persona Responsable</label>
-                                    <select
-                                        id={`person-${task.tempId}`}
-                                        value={task.responsible_person_id ?? ''}
-                                        onChange={(e) => handleTaskChange(task.tempId, 'responsible_person_id', e.target.value)}
-                                        className={`${inputBaseStyles} appearance-none`}
-                                        style={selectArrowStyle}
-                                    >
-                                        {availablePersons.map(person => <option key={person.id} value={person.id}>{person.full_name}</option>)}
-                                    </select>
+                                    <label className="text-sm font-semibold text-slate-700">Persona Responsable</label>
+                                    <EnhancedSelect
+                                        value={task.responsible_person_id ? String(task.responsible_person_id) : ''}
+                                        onChange={(v)=> handleTaskChange(task.tempId, 'responsible_person_id', v || null)}
+                                        options={availablePersons.map(p=>({ value:p.id, label:p.full_name }))}
+                                        placeholder="Seleccionar persona"
+                                        searchable
+                                        clearable
+                                    />
                                 </div>
                                 <div className="flex flex-col gap-1.5">
                                     <label htmlFor={`date-${task.tempId}`} className="text-sm font-semibold text-slate-700">Fecha Límite</label>

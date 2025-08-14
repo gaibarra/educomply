@@ -6,7 +6,7 @@ import PlusCircleIcon from './icons/PlusCircleIcon';
 import TrashIcon from './icons/TrashIcon';
 
 const InfoCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-    <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+    <div className="glass p-6 rounded-xl shadow-md border border-white/10">
         <h3 className="text-xl font-bold text-slate-800 mb-4 pb-2 border-b border-slate-200">{title}</h3>
         <div className="space-y-4">{children}</div>
     </div>
@@ -24,6 +24,7 @@ const InstitucionView: React.FC<InstitucionViewProps> = ({ profile, institutionP
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [phoneCodeError, setPhoneCodeError] = useState<string | null>(null);
     const [isDirty, setIsDirty] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,8 +44,32 @@ const InstitucionView: React.FC<InstitucionViewProps> = ({ profile, institutionP
         setIsDirty(true);
     };
 
+    const normalizePhoneCode = (v: string | null | undefined): string | null => {
+        if (!v) return null;
+        let s = String(v).trim();
+        if (!s) return null;
+        if (s.startsWith('00')) s = '+' + s.slice(2);
+        s = s.replace(/\s/g, '');
+        if (!s.startsWith('+')) s = '+' + s;
+        // Basic strict validation: + followed by 1-4 digits, first digit 1-9
+        const re = /^\+[1-9]\d{0,3}$/;
+        if (!re.test(s)) {
+            setPhoneCodeError('Formato inválido. Use por ejemplo +52, +57, +593.');
+            return s; // keep normalized but invalid; will block save
+        }
+        setPhoneCodeError(null);
+        return s;
+    };
+
     const handleSave = async () => {
         if (!localProfile || !isUserAdmin || !isDirty) return;
+        // Re-validate phone code before saving
+        const normalizedCode = normalizePhoneCode(localProfile.phone_country_code);
+        const re = /^\+[1-9]\d{0,3}$/;
+        if (normalizedCode && !re.test(normalizedCode)) {
+            setError('No se puede guardar: prefijo telefónico inválido.');
+            return;
+        }
         setSaving(true);
         setError(null);
         
@@ -52,6 +77,7 @@ const InstitucionView: React.FC<InstitucionViewProps> = ({ profile, institutionP
             name: localProfile.name,
             legal_representative: localProfile.legal_representative,
             logo_url: localProfile.logo_url,
+            phone_country_code: normalizedCode,
             locations: localProfile.locations,
             educational_levels: localProfile.educational_levels,
             authorities: localProfile.authorities,
@@ -140,7 +166,7 @@ const InstitucionView: React.FC<InstitucionViewProps> = ({ profile, institutionP
     };
 
 
-    const inputClasses = `w-full p-2 border rounded-md text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-secondary ${isUserAdmin ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 cursor-not-allowed'}`;
+    const inputClasses = `w-full p-2 border rounded-md text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary ${isUserAdmin ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/10 cursor-not-allowed'}`;
 
     if (!localProfile) {
          return (
@@ -185,9 +211,23 @@ const InstitucionView: React.FC<InstitucionViewProps> = ({ profile, institutionP
                             <input type="text" value={localProfile.legal_representative || ''} onChange={(e) => handleFieldChange('legal_representative', e.target.value)} disabled={!isUserAdmin} className={inputClasses} />
                         </div>
                         <div>
+                            <label className="text-sm font-semibold text-slate-600 mb-1 block">Prefijo telefónico por defecto (WhatsApp)</label>
+                            <input
+                                type="text"
+                                placeholder="+52"
+                                value={localProfile.phone_country_code || ''}
+                                onChange={(e) => handleFieldChange('phone_country_code', e.target.value)}
+                                onBlur={(e) => handleFieldChange('phone_country_code', normalizePhoneCode(e.target.value))}
+                                disabled={!isUserAdmin}
+                                className={inputClasses}
+                            />
+                            <p className="text-xs text-slate-400 mt-1">Formato E.164 (ejemplo +52, +57). Se usa para normalizar números en enlaces de WhatsApp.</p>
+                            {phoneCodeError && <p className="text-xs text-red-400 mt-1">{phoneCodeError}</p>}
+                        </div>
+                        <div>
                             <label className="text-sm font-semibold text-slate-600 mb-1 block">Logotipo</label>
                             <div className="flex items-center gap-4">
-                                <div className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed">
+                                <div className="w-24 h-24 bg-white/10 rounded-lg flex items-center justify-center border-2 border-dashed border-white/20">
                                     {localProfile.logo_url ? (
                                         <img src={localProfile.logo_url} alt="Logotipo de la institución" className="w-full h-full object-contain p-2" />
                                     ) : (
@@ -234,7 +274,7 @@ const InstitucionView: React.FC<InstitucionViewProps> = ({ profile, institutionP
 
                     <InfoCard title="Ubicaciones (Campus/Sedes)">
                          {localProfile.locations.map(loc => (
-                            <div key={loc.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                            <div key={loc.id} className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
                                 <input placeholder="Nombre de la sede" type="text" value={loc.name} disabled={!isUserAdmin} className={inputClasses} onChange={(e) => updateListItem('locations', {...loc, name: e.target.value})} />
                                 <textarea placeholder="Dirección completa" value={loc.address} disabled={!isUserAdmin} className={`${inputClasses} min-h-[60px]`} onChange={(e) => updateListItem('locations', {...loc, address: e.target.value})} />
                                 {isUserAdmin && <button onClick={() => deleteListItem('locations', loc.id)} className="text-xs text-red-500 hover:underline">Eliminar Ubicación</button>}
@@ -246,7 +286,7 @@ const InstitucionView: React.FC<InstitucionViewProps> = ({ profile, institutionP
                 <div className="space-y-8">
                      <InfoCard title="Autoridades y Estructura Administrativa">
                          {localProfile.authorities.map(auth => (
-                            <div key={auth.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                            <div key={auth.id} className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
                                 <input placeholder="Puesto" type="text" value={auth.position} disabled={!isUserAdmin} className={inputClasses} onChange={(e) => updateListItem('authorities', {...auth, position: e.target.value})} />
                                 <input placeholder="Nombre de la Persona" value={auth.name} disabled={!isUserAdmin} className={inputClasses} onChange={(e) => updateListItem('authorities', {...auth, name: e.target.value})} />
                                 {isUserAdmin && <button onClick={() => deleteListItem('authorities', auth.id)} className="text-xs text-red-500 hover:underline">Eliminar Autoridad</button>}
@@ -257,7 +297,7 @@ const InstitucionView: React.FC<InstitucionViewProps> = ({ profile, institutionP
 
                     <InfoCard title="Oferta Educativa (Nivel Superior)">
                          {localProfile.academic_programs.map(prog => (
-                            <div key={prog.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                            <div key={prog.id} className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
                                 <select value={prog.level} disabled={!isUserAdmin} className={`${inputClasses} appearance-none`} onChange={(e) => updateListItem('academic_programs', {...prog, level: e.target.value as any})}>
                                     <option value="Licenciatura">Licenciatura</option>
                                     <option value="Posgrado">Posgrado</option>

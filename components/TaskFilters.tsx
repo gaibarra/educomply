@@ -1,4 +1,5 @@
 import React from 'react';
+import EnhancedSelect from './EnhancedSelect';
 import { TaskFilters as TaskFiltersType, ScopeLevel } from '../types';
 import FilterIcon from './icons/FilterIcon';
 import XCircleIcon from './icons/XCircleIcon';
@@ -16,7 +17,7 @@ interface TaskFiltersProps {
 
 const FilterInputWrapper: React.FC<{ children: React.ReactNode; label: string }> = ({ children, label }) => (
     <div className="flex flex-col gap-1.5 w-full">
-        <label className="text-sm font-medium text-slate-600">{label}</label>
+        <label className="text-xs font-semibold tracking-wide uppercase text-slate-200/80">{label}</label>
         {children}
     </div>
 );
@@ -36,18 +37,12 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
         onFiltersChange(prev => ({ ...prev, [name]: value }));
     };
     
-    const inputBaseClasses = "w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-colors duration-200 ease-in-out";
+    const inputBaseClasses = "w-full p-2.5 bg-white/10 border border-white/20 rounded-lg text-sm text-slate-100 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-200 ease-in-out";
     
-    const selectArrowStyle = {
-        backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%2364748b\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")',
-        backgroundPosition: 'right 0.5rem center',
-        backgroundRepeat: 'no-repeat',
-        backgroundSize: '1.5em 1.5em',
-        paddingRight: '2.5rem'
-    };
+    // selectArrowStyle removed (replaced by EnhancedSelect)
 
     return (
-        <div className="bg-white p-5 rounded-xl shadow-lg mb-8 border border-slate-200">
+    <div className="glass p-5 rounded-xl shadow-lg mb-8 border border-white/10">
             <div className="flex items-center gap-3 mb-5">
                 <FilterIcon className="w-6 h-6 text-brand-primary"/>
                 <h3 className="text-xl font-bold text-brand-primary">Filtros de Búsqueda</h3>
@@ -68,20 +63,23 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
                 
                 {/* Status Filter */}
                 <FilterInputWrapper label="Estado">
-                    <select name="status" value={filters.status} onChange={handleInputChange} className={`${inputBaseClasses} appearance-none`} style={selectArrowStyle}>
-                       <option value="Todos">Todos</option>
-                       <option value="Atrasada">Atrasada</option>
-                       <option value="Pendiente">Pendiente</option>
-                       <option value="En Progreso">En Progreso</option>
-                       <option value="Completada">Completada</option>
-                    </select>
+                    <EnhancedSelect
+                        value={filters.status === 'Todos' ? '' : filters.status}
+                        onChange={(v)=> onFiltersChange(prev=>({...prev, status: v || 'Todos'}))}
+                        options={[{value:'',label:'Todos'},'Atrasada','Pendiente','En Progreso','Completada'].map(v=> typeof v==='string'? { value:v, label: v||'Todos'}: v)}
+                        placeholder="Todos"
+                        className="bg-transparent"
+                    />
                 </FilterInputWrapper>
 
                 {/* Scope Level */}
                 <FilterInputWrapper label="Nivel de Ámbito">
-                    <select name="scopeLevel" value={filters.scopeLevel} onChange={handleInputChange} className={`${inputBaseClasses} appearance-none`} style={selectArrowStyle}>
-                       {availableScopeLevels.map(level => <option key={level} value={level}>{level === 'Todos' ? 'Todos los Niveles' : level}</option>)}
-                    </select>
+                    <EnhancedSelect
+                        value={filters.scopeLevel === 'Todos'? '' : (filters.scopeLevel as string)}
+                        onChange={(v)=> onFiltersChange(prev=>({...prev, scopeLevel: (v || 'Todos') as any}))}
+                        options={availableScopeLevels.map(l=> ({ value: l==='Todos'? '': l, label: l==='Todos'? 'Todos los Niveles': l }))}
+                        placeholder="Todos los Niveles"
+                    />
                 </FilterInputWrapper>
 
                 {/* Scope Entity */}
@@ -99,25 +97,32 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
                 
                 {/* Category Filter */}
                 <FilterInputWrapper label="Categoría">
-                    <select name="category" value={filters.category} onChange={handleInputChange} className={`${inputBaseClasses} appearance-none`} style={selectArrowStyle}>
-                        {availableCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
+                    <EnhancedSelect
+                        value={filters.category}
+                        onChange={(v)=> onFiltersChange(prev=>({...prev, category: v || ''}))}
+                        options={availableCategories.map(cat=> ({ value: cat, label: cat }))}
+                        placeholder="Todas"
+                    />
                 </FilterInputWrapper>
                 
                  {/* Area Filter */}
                 <FilterInputWrapper label="Área Responsable">
-                    <select name="responsibleArea" value={filters.responsibleArea} onChange={handleInputChange} className={`${inputBaseClasses} appearance-none`} style={selectArrowStyle}>
-                         <option value="Todos">Todas</option>
-                         {availableAreas.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}
-                    </select>
+                    <EnhancedSelect
+                        value={filters.responsibleArea === 'Todos'? '' : filters.responsibleArea}
+                        onChange={(v)=> onFiltersChange(prev=>({...prev, responsibleArea: v || 'Todos'}))}
+                        options={[{value:'',label:'Todas'}, ...availableAreas.map(a=>({ value:a.id, label:a.name }))]}
+                        placeholder="Todas"
+                    />
                 </FilterInputWrapper>
                 
                  {/* Person Filter */}
                 <FilterInputWrapper label="Persona Responsable">
-                    <select name="responsiblePerson" value={filters.responsiblePerson} onChange={handleInputChange} className={`${inputBaseClasses} appearance-none`} style={selectArrowStyle}>
-                       <option value="Todos">Todas</option>
-                       {availablePersons.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
-                    </select>
+                    <EnhancedSelect
+                        value={filters.responsiblePerson === 'Todos'? '' : filters.responsiblePerson}
+                        onChange={(v)=> onFiltersChange(prev=>({...prev, responsiblePerson: v || 'Todos'}))}
+                        options={[{value:'',label:'Todas'}, ...availablePersons.map(p=>({ value:p.id, label:p.name }))]}
+                        placeholder="Todas"
+                    />
                 </FilterInputWrapper>
                 
                 {/* Date Range Start */}
@@ -156,7 +161,7 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
             <div className="mt-6 pt-4 border-t border-slate-200 flex justify-end">
                  <button 
                     onClick={onClearFilters}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-100 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
                 >
                     <XCircleIcon className="w-5 h-5"/>
                     <span>Limpiar Filtros</span>

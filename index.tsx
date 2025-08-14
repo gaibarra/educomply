@@ -1,5 +1,7 @@
 import React from 'react';
 import './src/styles/tailwind.css';
+// Import self-hosted fonts (add the .woff2 files into public/fonts). Safe even if files missing.
+import './public/fonts/fonts.css';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 

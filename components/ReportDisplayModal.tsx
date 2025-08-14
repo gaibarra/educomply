@@ -12,16 +12,16 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
     const lines = content.split('\n');
     const elements = lines.map((line, index) => {
         if (line.startsWith('# ')) {
-            return <h2 key={index} className="text-2xl font-bold text-brand-primary mt-6 mb-3 border-b pb-2">{line.substring(2)}</h2>;
+            return <h2 key={index} className="text-2xl font-extrabold text-gradient mt-6 mb-3 border-b border-white/10 pb-2">{line.substring(2)}</h2>;
         }
         if (line.startsWith('## ')) {
-            return <h3 key={index} className="text-xl font-bold text-slate-800 mt-5 mb-2">{line.substring(3)}</h3>;
+            return <h3 key={index} className="text-xl font-bold text-slate-100 mt-5 mb-2">{line.substring(3)}</h3>;
         }
         if (line.startsWith('### ')) {
-            return <h4 key={index} className="text-lg font-semibold text-slate-700 mt-4 mb-1">{line.substring(4)}</h4>;
+            return <h4 key={index} className="text-lg font-semibold text-slate-200 mt-4 mb-1">{line.substring(4)}</h4>;
         }
         if (line.startsWith('* ')) {
-            return <li key={index} className="ml-6 list-disc text-slate-600">{line.substring(2)}</li>;
+            return <li key={index} className="ml-6 list-disc text-slate-200">{line.substring(2)}</li>;
         }
         if (line.trim() === '---') {
             return <hr key={index} className="my-6" />;
@@ -31,7 +31,7 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
         const renderedParts = parts.map((part, i) =>
             i % 2 === 1 ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>
         );
-        return <p key={index} className="text-slate-700 mb-2 leading-relaxed">{renderedParts}</p>;
+    return <p key={index} className="text-slate-200 mb-2 leading-relaxed">{renderedParts}</p>;
     });
     return <>{elements}</>;
 };
@@ -73,24 +73,24 @@ const ReportDisplayModal: React.FC<ReportDisplayModalProps> = ({ isOpen, onClose
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 animate-fade-in" aria-modal="true" role="dialog">
-            <div className="bg-slate-50 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col transform transition-all duration-300 scale-100">
-                <div className="p-5 border-b border-slate-200 flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-brand-primary">{report.title}</h2>
-                    <button onClick={onClose} className="p-2 text-slate-500 hover:bg-slate-200 rounded-full">
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 animate-fade-in" aria-modal="true" role="dialog">
+            <div className="glass rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col transform transition-all duration-300 scale-100">
+                <div className="p-5 border-b border-white/10 flex justify-between items-center">
+                    <h2 className="text-xl font-extrabold text-gradient">{report.title}</h2>
+                    <button onClick={onClose} className="p-2 text-slate-300 hover:bg-white/10 rounded-full">
                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
                 
-                <div ref={reportContentRef} className="flex-grow overflow-y-auto p-8 bg-white">
+                <div ref={reportContentRef} className="flex-grow overflow-y-auto p-8 bg-transparent">
                     <MarkdownRenderer content={report.content} />
                 </div>
 
-                <div className="p-4 bg-slate-100/80 backdrop-blur-sm border-t border-slate-200 flex justify-end items-center gap-4">
-                    <button onClick={onClose} className="px-6 py-2 text-sm font-semibold text-slate-700 bg-slate-200 rounded-lg hover:bg-slate-300 transition-colors">
+                <div className="p-4 bg-white/5 backdrop-blur-sm border-t border-white/10 flex justify-end items-center gap-4">
+                    <button onClick={onClose} className="px-6 py-2 text-sm font-semibold text-slate-100 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
                         Cerrar
                     </button>
-                    <button onClick={handlePrint} className="px-6 py-2 text-sm font-bold text-white bg-brand-secondary rounded-lg hover:bg-brand-primary transition-all shadow-md hover:shadow-lg">
+                    <button onClick={handlePrint} className="px-6 py-2 text-sm font-bold text-white rounded-lg transition-all shadow-md hover:shadow-lg" style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)'}}>
                         Imprimir
                     </button>
                 </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import EnhancedSelect from './EnhancedSelect';
 import { getComplianceAnalysis } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
 import type { AiComplianceResponse, EditableAiObligation, ResponsibleArea, Task, ScopeLevel, ScopeSelection, Profile, View, InstitutionProfileRow } from '../types';
@@ -39,12 +40,13 @@ const AiResultDisplay: React.FC<{
     const [addingAreaFor, setAddingAreaFor] = useState<string | null>(null);
     const [newAreaName, setNewAreaName] = useState('');
 
-    const handleAreaSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>, obligationId: string) => {
-        if (e.target.value === 'ADD_NEW_AREA') {
+    const handleAreaSelectChangeValue = async (val: string, obligationId: string) => {
+        if (val === 'ADD_NEW_AREA') {
             setAddingAreaFor(obligationId);
             setNewAreaName('');
         } else {
-            onObligationChange(obligationId, 'responsible_area_id', Number(e.target.value));
+            if(val === '') onObligationChange(obligationId, 'responsible_area_id', null);
+            else onObligationChange(obligationId, 'responsible_area_id', Number(val));
         }
     };
 
@@ -64,26 +66,29 @@ const AiResultDisplay: React.FC<{
     const firstSelectedId = selectedObligations[0]?.id;
 
     return (
-    <div className="mt-6 bg-white p-6 rounded-lg shadow-lg animate-fade-in">
-        <h3 className="text-2xl font-bold text-brand-primary mb-4">Análisis de Cumplimiento por IA</h3>
+    <div className="mt-10 bg-white dark:bg-slate-800/70 p-6 md:p-8 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 animate-fade-in backdrop-blur-sm">
+        <h3 className="text-2xl font-bold text-brand-primary dark:text-slate-100 mb-6 flex items-center gap-3">
+            <SparklesIcon className="h-7 w-7 text-brand-accent animate-pulse-glow"/>
+            Análisis de Cumplimiento por IA
+        </h3>
         
-        <div className="mb-6">
-            <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-brand-accent pb-2 mb-3">Resumen</h4>
-            <p className="text-slate-600">{summary}</p>
+        <div className="mb-8">
+            <h4 className="text-lg font-semibold text-slate-700 dark:text-slate-200 border-b-2 border-brand-accent pb-2 mb-4 tracking-wide uppercase">Resumen</h4>
+            <p className="text-slate-600 dark:text-slate-300 leading-relaxed">{summary}</p>
         </div>
 
-        <div className="mb-6">
-            <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-brand-accent pb-2 mb-3">Obligaciones y Recomendaciones</h4>
-            <p className="text-sm text-slate-500 mb-4">Seleccione los elementos, asigne responsables, fechas y el ámbito de aplicación. Estas acciones se convertirán en tareas de seguimiento.</p>
-            <ul className="space-y-4">
+        <div className="mb-8">
+            <h4 className="text-lg font-semibold text-slate-700 dark:text-slate-200 border-b-2 border-brand-accent pb-2 mb-4 tracking-wide uppercase">Obligaciones y Recomendaciones</h4>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Seleccione los elementos, asigne responsables, fechas y ámbito. Se convertirán en tareas de seguimiento.</p>
+            <ul className="space-y-5">
                 {obligations.map((item) => (
-                    <li key={item.id} className={`bg-slate-50 p-4 rounded-lg border-l-4 transition-all duration-300 ${item.selected ? 'border-brand-secondary shadow-sm' : 'border-slate-200'}`}>
+                    <li key={item.id} className={`group relative bg-slate-50 dark:bg-slate-900/40 p-5 rounded-lg border-l-4 transition-all duration-300 ${item.selected ? 'border-brand-secondary shadow-sm ring-1 ring-brand-secondary/20' : 'border-slate-200 dark:border-slate-700'} hover:shadow-md` }>
                         <div className="flex items-start gap-4">
                             <input
                                 type="checkbox"
                                 checked={item.selected}
                                 onChange={(e) => onObligationChange(item.id, 'selected', e.target.checked)}
-                                className="mt-2 h-5 w-5 rounded border-gray-300 text-brand-secondary focus:ring-brand-secondary cursor-pointer"
+                                className="mt-2 h-5 w-5 rounded border-gray-300 dark:border-slate-600 text-brand-secondary focus:ring-brand-secondary cursor-pointer shadow-sm"
                                 aria-label={`Seleccionar obligación: ${item.obligation}`}
                             />
 
@@ -91,7 +96,7 @@ const AiResultDisplay: React.FC<{
                                 <textarea
                                     value={item.obligation}
                                     onChange={(e) => onObligationChange(item.id, 'obligation', e.target.value)}
-                                    className={`w-full p-2 border rounded-md transition-all duration-200 text-base ${item.selected ? 'bg-white border-slate-300 text-slate-800 font-medium' : 'bg-transparent border-transparent text-slate-600'}`}
+                                    className={`w-full p-2 border rounded-md transition-all duration-200 text-base resize-none leading-snug ${item.selected ? 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 font-medium shadow-sm focus:ring-2 focus:ring-brand-secondary/40' : 'bg-transparent border-transparent text-slate-600 dark:text-slate-400 group-hover:bg-white/40 dark:group-hover:bg-slate-800/30'}`}
                                     rows={item.selected ? 2 : 1}
                                     disabled={!item.selected}
                                     aria-label="Descripción de la obligación"
@@ -99,132 +104,124 @@ const AiResultDisplay: React.FC<{
                                 />
                                 
                                 {!item.selected && (
-                                    <div className="mt-2 text-sm text-slate-500 flex items-center gap-4 flex-wrap">
-                                        <p><strong>Fuente:</strong> {item.source}</p>
-                                        <span className='bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-xs font-medium'>{item.category}</span>
+                                    <div className="mt-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 flex items-center gap-4 flex-wrap">
+                                        <p className="truncate max-w-full"><span className="font-semibold">Fuente:</span> {item.source}</p>
+                                        <span className='bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-200 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium tracking-wide uppercase'>
+                                            {item.category}
+                                        </span>
                                     </div>
                                 )}
                                 
                                 {item.selected && (
-                                     <div className="mt-4 space-y-4">
+                     <div className="mt-5 space-y-5">
                                         {item.id === firstSelectedId && selectedCount > 1 && (
-                                             <div className="p-2 bg-yellow-50 border border-dashed border-yellow-300 rounded-md transition-all animate-fade-in">
+                         <div className="p-3 bg-yellow-50 dark:bg-yellow-100/10 border border-dashed border-yellow-300 dark:border-yellow-400/60 rounded-md transition-all animate-fade-in">
                                                  <button
                                                      onClick={() => onReplicateData(item.id)}
-                                                     className="flex items-center gap-2.5 text-sm font-semibold text-yellow-800 hover:text-yellow-900 transition-colors w-full justify-center p-2 rounded-md hover:bg-yellow-100"
+                             className="flex items-center gap-2.5 text-sm font-semibold text-yellow-800 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-200 transition-colors w-full justify-center p-2 rounded-md hover:bg-yellow-100 dark:hover:bg-yellow-400/10"
                                                  >
                                                      <SparklesIcon className="h-5 w-5 text-yellow-500"/>
                                                      <span>Replicar datos en los <strong>{selectedCount - 1}</strong> otros elementos seleccionados</span>
                                                  </button>
                                              </div>
                                         )}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4 bg-white rounded-md border border-slate-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5 p-5 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 shadow-sm">
                                             {/* Fuente Legal */}
                                             <div className="flex flex-col gap-1.5">
-                                                <label htmlFor={`source-${item.id}`} className="text-sm font-medium text-slate-600">Fuente Legal</label>
+                                                <label htmlFor={`source-${item.id}`} className="text-sm font-medium text-slate-600 dark:text-slate-300">Fuente Legal</label>
                                                 <input
                                                     id={`source-${item.id}`} type="text" value={item.source}
                                                     onChange={(e) => onObligationChange(item.id, 'source', e.target.value)}
-                                                    className="w-full p-2 border rounded-md text-sm bg-white border-slate-300 text-slate-800"
+                                                    className="w-full p-2 border rounded-md text-sm bg-white dark:bg-slate-700/60 border-slate-300 dark:border-slate-500 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-brand-secondary/40"
                                                     placeholder="Ej: Ley General de Educación, Art. 15"
                                                 />
                                             </div>
                                             {/* Categoría */}
                                             <div className="flex flex-col gap-1.5">
-                                                <label htmlFor={`cat-${item.id}`} className="text-sm font-medium text-slate-600">Categoría</label>
+                                                <label htmlFor={`cat-${item.id}`} className="text-sm font-medium text-slate-600 dark:text-slate-300">Categoría</label>
                                                 <input
                                                     id={`cat-${item.id}`} type="text" value={item.category}
                                                     onChange={(e) => onObligationChange(item.id, 'category', e.target.value)}
-                                                    className="w-full p-2 border rounded-md text-sm bg-white border-slate-300 text-slate-800"
+                                                    className="w-full p-2 border rounded-md text-sm bg-white dark:bg-slate-700/60 border-slate-300 dark:border-slate-500 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-brand-secondary/40"
                                                     placeholder="Ej: Laboral"
                                                 />
                                             </div>
                                             {/* Fecha Compromiso */}
                                             <div className="flex flex-col gap-1.5">
-                                                <label htmlFor={`due-date-${item.id}`} className="text-sm font-medium text-slate-600">Fecha Compromiso</label>
+                                                <label htmlFor={`due-date-${item.id}`} className="text-sm font-medium text-slate-600 dark:text-slate-300">Fecha Compromiso</label>
                                                 <div className="relative">
-                                                    <input id={`due-date-${item.id}`} type="date" value={item.due_date} onChange={(e) => onObligationChange(item.id, 'due_date', e.target.value)} className="w-full p-2 border rounded-md text-sm bg-white border-slate-300 text-slate-800 pr-9"/>
-                                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                                        <CalendarIcon className="h-5 w-5 text-slate-400" />
+                                                    <input id={`due-date-${item.id}`} type="date" value={item.due_date} onChange={(e) => onObligationChange(item.id, 'due_date', e.target.value)} className="w-full p-2 border rounded-md text-sm bg-white dark:bg-slate-700/60 border-slate-300 dark:border-slate-500 text-slate-800 dark:text-slate-100 pr-9 focus:ring-2 focus:ring-brand-secondary/40"/>
+                                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400 dark:text-slate-500">
+                                                        <CalendarIcon className="h-5 w-5" />
                                                     </div>
                                                 </div>
                                             </div>
                                             {/* Área Responsable */}
                                             <div className="flex flex-col gap-1.5">
-                                                <label htmlFor={`resp-${item.id}`} className="text-sm font-medium text-slate-600">Área Responsable</label>
+                                                <label htmlFor={`resp-${item.id}`} className="text-sm font-medium text-slate-600 dark:text-slate-300">Área Responsable</label>
                                                 {addingAreaFor === item.id ? (
                                                     <div className="flex items-center gap-1.5">
-                                                        <input type="text" value={newAreaName} onChange={(e) => setNewAreaName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSaveNewArea(item.id)} className="flex-grow p-2 border rounded-md text-sm bg-white border-slate-300 text-slate-800" placeholder="Nueva área" autoFocus />
+                                                        <input type="text" value={newAreaName} onChange={(e) => setNewAreaName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSaveNewArea(item.id)} className="flex-grow p-2 border rounded-md text-sm bg-white dark:bg-slate-700/60 border-slate-300 dark:border-slate-500 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-brand-secondary/40" placeholder="Nueva área" autoFocus />
                                                         <button onClick={() => handleSaveNewArea(item.id)} className="p-2 bg-status-success text-white rounded-md hover:bg-green-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg></button>
                                                         <button onClick={() => setAddingAreaFor(null)} className="p-2 bg-status-danger text-white rounded-md hover:bg-red-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button>
                                                     </div>
                                                 ) : (
-                                                    <select id={`resp-${item.id}`} value={item.responsible_area_id ?? ''} onChange={(e) => handleAreaSelectChange(e, item.id)} className="w-full p-2 border rounded-md text-sm bg-white border-slate-300 text-slate-800">
-                                                        <option value="">Sin asignar</option>
-                                                        {responsibleAreas.map(area => (<option key={area.id} value={area.id} className="text-slate-800">{area.name}</option>))}
-                                                        <option value="ADD_NEW_AREA" className="font-bold text-brand-secondary bg-slate-100 pt-2 mt-1 border-t">+ Agregar nueva área...</option>
-                                                    </select>
+                                                    <EnhancedSelect
+                                                        value={item.responsible_area_id ? String(item.responsible_area_id) : ''}
+                                                        onChange={(v)=> handleAreaSelectChangeValue(v || '', item.id)}
+                                                        options={[{value:'',label:'Sin asignar'}, ...responsibleAreas.map(a=>({value:String(a.id), label:a.name})), {value:'ADD_NEW_AREA', label:'+ Agregar nueva área...'}]}
+                                                        placeholder="Área responsable"
+                                                    />
                                                 )}
                                             </div>
                                             {/* Persona Responsable */}
                                             <div className="flex flex-col gap-1.5">
-                                                <label htmlFor={`person-${item.id}`} className="text-sm font-medium text-slate-600">Persona Responsable</label>
-                                                
-                                                <select id={`person-${item.id}`} value={item.responsible_person_id ?? ''} onChange={(e) => onObligationChange(item.id, 'responsible_person_id', e.target.value)} className="w-full p-2 border rounded-md text-sm bg-white border-slate-300 text-slate-800">
-                                                    <option value="">Sin asignar</option>
-                                                    {responsiblePersons.map(person => (<option key={person.id} value={person.id} className="text-slate-800">{person.full_name}</option>))}
-                                                </select>
+                                                <label htmlFor={`person-${item.id}`} className="text-sm font-medium text-slate-600 dark:text-slate-300">Persona Responsable</label>
+                                                <EnhancedSelect
+                                                    value={item.responsible_person_id ? String(item.responsible_person_id) : ''}
+                                                    onChange={(v)=> onObligationChange(item.id, 'responsible_person_id', v || null)}
+                                                    options={[{value:'',label:'Sin asignar'}, ...responsiblePersons.map(p=>({ value:String(p.id), label:p.full_name }))]}
+                                                    placeholder="Asignar persona"
+                                                />
                                             </div>
                                         </div>
                                         {/* Ámbito de Aplicación */}
-                                        <div className="p-4 bg-white rounded-md border border-slate-200">
-                                            <h5 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                        <div className="p-5 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 shadow-sm">
+                                            <h5 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2 tracking-wide uppercase">
                                                 <BuildingOfficeIcon className="w-5 h-5 text-brand-secondary"/>
                                                 Ámbito de Aplicación
                                             </h5>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div className="flex flex-col gap-1.5">
-                                                    <label htmlFor={`scope-level-${item.id}`} className="text-xs font-medium text-slate-500">Nivel</label>
-                                                    <select
-                                                        id={`scope-level-${item.id}`}
+                                                    <label htmlFor={`scope-level-${item.id}`} className="text-xs font-medium text-slate-500 dark:text-slate-400">Nivel</label>
+                                                    <EnhancedSelect
                                                         value={item.scope.level}
-                                                        onChange={(e) => onScopeChange(item.id, { level: e.target.value as ScopeLevel, entities: [] })}
-                                                        className="w-full p-2 border rounded-md text-sm bg-white border-slate-300 text-slate-800"
-                                                    >
-                                                        <option value="Institución">Institución (Global)</option>
-                                                        {(Object.keys(scopeOptions) as Array<keyof typeof scopeOptions>).map(level => (
-                                                            <option key={level} value={level}>{level}</option>
-                                                        ))}
-                                                    </select>
+                                                        onChange={(v)=> onScopeChange(item.id, { level: (v || 'Institución') as ScopeLevel, entities: [] })}
+                                                        options={[{value:'Institución', label:'Institución (Global)'}, ...(Object.keys(scopeOptions) as Array<keyof typeof scopeOptions>).map(level=>({ value: level, label: level }))]}
+                                                        placeholder="Nivel"
+                                                    />
                                                 </div>
                                                 {item.scope.level !== 'Institución' && (
                                                     <div className="flex flex-col gap-1.5">
-                                                        <label htmlFor={`scope-entities-${item.id}`} className="text-xs font-medium text-slate-500">
+                                                        <label htmlFor={`scope-entities-${item.id}`} className="text-xs font-medium text-slate-500 dark:text-slate-400">
                                                             {item.scope.level} Específicos
                                                         </label>
-                                                        <select
+                                                        <EnhancedSelect
                                                             multiple
-                                                            id={`scope-entities-${item.id}`}
                                                             value={item.scope.entities}
-                                                            onChange={(e) => {
-                                                                const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, option => (option as HTMLOptionElement).value);
-                                                                onScopeChange(item.id, { ...item.scope, entities: selected });
-                                                            }}
-                                                            className="w-full p-2 border rounded-md text-sm bg-white border-slate-300 text-slate-800 h-24"
-                                                        >
-                                                            {(scopeOptions[item.scope.level as keyof typeof scopeOptions] || []).map(entity => (
-                                                                <option key={entity} value={entity}>{entity}</option>
-                                                            ))}
-                                                        </select>
-                                                        <p className="text-xs text-slate-400">Mantenga Ctrl/Cmd para seleccionar varios.</p>
+                                                            onChange={(vals)=> onScopeChange(item.id, { ...item.scope, entities: vals })}
+                                                            options={(scopeOptions[item.scope.level as keyof typeof scopeOptions] || []).map(entity=>({ value: entity, label: entity }))}
+                                                            placeholder="Seleccionar..."
+                                                        />
+                                                        <p className="text-xs text-slate-400 dark:text-slate-500">Puede buscar y seleccionar múltiples.</p>
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
                                         {/* Documentos Sugeridos */}
                                         {item.documents && item.documents.length > 0 && (
-                                            <div className="p-4 bg-white rounded-md border border-slate-200">
-                                                <h5 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                            <div className="p-5 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 shadow-sm">
+                                                <h5 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2 tracking-wide uppercase">
                                                     <DocumentTextIcon className="w-5 h-5 text-brand-secondary"/>
                                                     Documentos Sugeridos por IA
                                                 </h5>
@@ -236,10 +233,10 @@ const AiResultDisplay: React.FC<{
                                                                 id={`doc-${item.id}-${doc.name}`}
                                                                 checked={doc.selected}
                                                                 onChange={(e) => onDocumentSelectionChange(item.id, doc.name, e.target.checked)}
-                                                                className="h-4 w-4 rounded border-gray-300 text-brand-secondary focus:ring-brand-secondary cursor-pointer"
+                                                                className="h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-brand-secondary focus:ring-brand-secondary cursor-pointer"
                                                                 aria-label={`Seleccionar documento: ${doc.name}`}
                                                             />
-                                                            <label htmlFor={`doc-${item.id}-${doc.name}`} className="text-sm text-slate-600 cursor-pointer">
+                                                            <label htmlFor={`doc-${item.id}-${doc.name}`} className="text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
                                                                 {doc.name}
                                                             </label>
                                                         </div>
@@ -254,10 +251,10 @@ const AiResultDisplay: React.FC<{
                     </li>
                 ))}
             </ul>
-             <div className="mt-4 pt-4 border-t border-slate-200">
+             <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
                 <button
                     onClick={onAddObligation}
-                    className="flex items-center gap-2 text-sm font-semibold text-brand-secondary hover:text-brand-primary transition-colors"
+                    className="flex items-center gap-2 text-sm font-semibold text-brand-secondary hover:text-brand-primary dark:text-brand-accent dark:hover:text-brand-secondary transition-colors"
                 >
                     <PlusCircleIcon className="h-5 w-5"/>
                     Agregar Obligación Manualmente
@@ -265,11 +262,11 @@ const AiResultDisplay: React.FC<{
             </div>
         </div>
         
-         <div className="mt-8 text-right">
+         <div className="mt-10 text-right">
             <button
                 onClick={onCreateTasks}
                 disabled={selectedCount === 0}
-                className="bg-brand-secondary text-white font-bold py-3 px-6 sm:px-8 rounded-lg hover:bg-brand-primary focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 text-base sm:text-lg shadow-lg hover:shadow-xl disabled:bg-slate-400 disabled:shadow-none disabled:cursor-not-allowed"
+                className="bg-brand-secondary dark:bg-brand-primary text-white font-bold py-3 px-6 sm:px-8 rounded-lg hover:bg-brand-primary dark:hover:bg-brand-secondary focus:outline-none focus:ring-4 focus:ring-brand-secondary/40 dark:focus:ring-brand-primary/50 transition-all duration-300 text-base sm:text-lg shadow-lg hover:shadow-xl disabled:bg-slate-400 disabled:dark:bg-slate-600 disabled:shadow-none disabled:cursor-not-allowed"
             >
                 Revisar y Crear {selectedCount > 0 ? `${selectedCount} ` : ''}Tarea{selectedCount !== 1 && 's'}
             </button>
@@ -490,6 +487,20 @@ const NormativasView: React.FC<NormativasViewProps> = ({ profile, setActiveView,
         setIsReviewModalOpen(true);
     };
 
+        const [projects, setProjects] = React.useState<{ id: string; name: string }[]>([]);
+        const [selectedProjectId, setSelectedProjectId] = React.useState<string | null>(null);
+
+        React.useEffect(() => {
+            (async () => {
+                try {
+                    const { data, error } = await supabase.from('projects' as any).select('id, name').order('name');
+                    if (!error && Array.isArray(data)) {
+                        setProjects(data as any);
+                    }
+                } catch { /* opcional */ }
+            })();
+        }, []);
+
         const handleSaveFinalTasks = async (finalTasks: Omit<Task, 'id'|'created_at'|'subTasks'|'responsible_area'|'responsible_person'>[]) => {
         const user = await supabase.auth.getUser();
         const userId = user.data.user?.id;
@@ -503,7 +514,7 @@ const NormativasView: React.FC<NormativasViewProps> = ({ profile, setActiveView,
                 const enriched = (finalTasks as any[]).map(t => {
                         const docs = Array.isArray(t.documents) ? t.documents : [];
                         return {
-                          // project_id eliminado del modelo simple
+                          // project_id opcional para modo multi-proyecto
                           title: t.description?.slice(0,120) || 'Tarea',
                           description: t.description,
                           status: 'todo',
@@ -512,11 +523,12 @@ const NormativasView: React.FC<NormativasViewProps> = ({ profile, setActiveView,
                           responsible_person_id: t.responsible_person_id,
                           due_date: (t.scope as any)?.due_date || (t as any).due_date || null,
                           scope: t.scope ? t.scope : null,
+                          project_id: selectedProjectId || null,
                           documents: docs
                         };
                 });
                 console.debug('[tasks] Inserción preparada', enriched);
-        const { error } = await supabase.from('tasks').insert(enriched);
+    const { error } = await supabase.from('tasks').insert(enriched);
         if (error) {
             console.error('Error creating tasks:', error, { enrichedSample: enriched[0] });
             setAlertInfo({isOpen: true, title: 'Error al Guardar', message: `No se pudieron crear las tareas. ${error.message}. Código: ${error.code}`});
@@ -531,6 +543,8 @@ const NormativasView: React.FC<NormativasViewProps> = ({ profile, setActiveView,
         }
     };
 
+    const [temperature, setTemperature] = useState<number>(0.4);
+
     const handleSearch = async () => {
         if (!query.trim()) {
             setAlertInfo({ isOpen: true, title: 'Consulta Vacía', message: 'Por favor, ingrese su consulta para realizar el análisis.' });
@@ -541,7 +555,7 @@ const NormativasView: React.FC<NormativasViewProps> = ({ profile, setActiveView,
         setAiResponse(null);
         setEditableObligations([]);
         try {
-            const response = await getComplianceAnalysis(query);
+            const response = await getComplianceAnalysis(query, temperature);
             setAiResponse(response);
             
             const commonInitialState = {
@@ -578,14 +592,37 @@ const NormativasView: React.FC<NormativasViewProps> = ({ profile, setActiveView,
     };
     
     return (
-        <div className="p-6 md:p-8">
-            <h2 className="text-3xl font-bold text-slate-800 mb-2">Catálogo y Análisis Normativo</h2>
-            <p className="text-slate-500 mb-6">Consulte el marco normativo y utilice el asistente de IA para análisis contextual.</p>
-
-            <div className="bg-white p-6 rounded-xl shadow-md">
-                <label htmlFor="ai-search" className="block text-lg font-semibold text-slate-700 mb-2">Asistente de Cumplimiento con IA</label>
-                <p className="text-sm text-slate-500 mb-4">
-                    Haga una pregunta en lenguaje natural. Ej: "¿Qué necesito para un laboratorio de química en preparatoria?"
+        <div className="p-6 md:p-8 max-w-7xl mx-auto">
+            {/* Encabezado principal mejorado */}
+            <div className="mb-8">
+                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-50 drop-shadow-sm">
+                    <span className="bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-accent bg-clip-text text-transparent">Catálogo y Análisis Normativo</span>
+                </h1>
+                <p className="mt-2 text-slate-300 max-w-3xl leading-relaxed">
+                    Consulte el marco normativo institucional y utilice el asistente de IA para convertir obligaciones y recomendaciones en tareas accionables.
+                </p>
+                {projects.length > 0 && (
+                    <div className="mt-6 flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-6">
+                        <div className="flex flex-col w-full max-w-sm">
+                            <label htmlFor="project-select" className="text-sm font-semibold text-slate-200 mb-1 tracking-wide">Proyecto destino para nuevas tareas</label>
+                            <select
+                                id="project-select"
+                                className="rounded-lg px-3 py-2 text-sm bg-slate-800/70 text-slate-100 placeholder:text-slate-400 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-secondary focus:border-brand-secondary shadow-inner backdrop-blur-md transition-colors"
+                                value={selectedProjectId || ''}
+                                onChange={(e) => setSelectedProjectId(e.target.value || null)}
+                            >
+                                <option value="">(Sin proyecto)</option>
+                                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                            <p className="text-[11px] text-slate-400 mt-1">Las tareas creadas se asociarán a este proyecto.</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <div className="bg-slate-800/70 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-slate-600/40 ring-1 ring-black/30">
+                <label htmlFor="ai-search" className="block text-lg font-bold text-slate-100 mb-2 tracking-tight">Asistente de Cumplimiento con IA</label>
+                <p className="text-sm text-slate-300/90 mb-4 leading-relaxed">
+                    Escriba una consulta en lenguaje natural. Ej: <span className="italic opacity-90">“¿Qué necesito para un laboratorio de química en preparatoria?”</span>
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2">
                     <input
@@ -595,13 +632,13 @@ const NormativasView: React.FC<NormativasViewProps> = ({ profile, setActiveView,
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSearch()}
                         placeholder="Escriba su consulta aquí..."
-                        className="flex-grow p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-secondary focus:border-transparent transition"
+                        className="flex-grow p-3 rounded-lg bg-slate-900/60 border border-slate-600 text-slate-100 placeholder:text-slate-500 focus:ring-2 focus:ring-brand-secondary focus:border-brand-secondary transition shadow-inner"
                         disabled={isLoading}
                     />
                     <button
                         onClick={handleSearch}
                         disabled={isLoading}
-                        className="bg-brand-primary text-white font-bold py-3 px-6 rounded-lg hover:bg-brand-secondary transition-all duration-300 flex items-center justify-center disabled:bg-slate-400 disabled:cursor-not-allowed"
+                        className="bg-gradient-to-r from-brand-primary to-brand-secondary text-white font-semibold py-3 px-6 rounded-lg hover:opacity-90 transition-all duration-300 flex items-center justify-center disabled:from-slate-500 disabled:to-slate-500 disabled:cursor-not-allowed shadow"
                     >
                         {isLoading ? (
                            <>
@@ -614,9 +651,32 @@ const NormativasView: React.FC<NormativasViewProps> = ({ profile, setActiveView,
                         ) : 'Buscar'}
                     </button>
                 </div>
-                 <p className="text-xs text-slate-400 mt-2">
-                    *El asistente de IA es una herramienta de apoyo. Verifique siempre la información con las fuentes oficiales.
-                </p>
+                                                <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-4 bg-slate-900/50 px-4 py-3 rounded-lg border border-slate-700/60">
+                                    <div className="flex-1">
+                                                        <label htmlFor="temperature" className="block text-[11px] font-semibold uppercase tracking-wide text-slate-300 mb-1">Temperatura (creatividad)</label>
+                                        <input
+                                            id="temperature"
+                                            type="range"
+                                            min={0}
+                                            max={1}
+                                            step={0.05}
+                                            value={temperature}
+                                            onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                                                            className="w-full accent-brand-secondary cursor-pointer"
+                                        />
+                                    </div>
+                                    <div className="w-28 text-center">
+                                                        <span className="text-sm font-semibold text-slate-100">{temperature.toFixed(2)}</span>
+                                                        <p className="text-[10px] text-slate-400 mt-0.5">0=Determinista 1=Creativo</p>
+                                    </div>
+                                                    <div className="flex flex-col gap-1 text-[10px] text-slate-400">
+                                        <span>Sugerido: 0.3–0.6</span>
+                                        <span className="hidden sm:inline">Ajuste según necesidad de exploración.</span>
+                                    </div>
+                                </div>
+                                                 <p className="text-[11px] text-slate-400 mt-3">
+                                                        *El asistente de IA es una herramienta de apoyo. Verifique siempre la información con las fuentes oficiales.
+                                                </p>
             </div>
 
             {isLoading && <LoadingSpinner />}
@@ -647,6 +707,8 @@ const NormativasView: React.FC<NormativasViewProps> = ({ profile, setActiveView,
                     availablePersons={responsiblePersons}
                 />
             )}
+
+            {/* Eliminado selector flotante fijo; ahora integrado arriba */}
 
             <AlertModal 
                 isOpen={alertInfo.isOpen}

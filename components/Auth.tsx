@@ -19,19 +19,19 @@ const Auth: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-100">
-            <div className="w-full max-w-md p-8 space-y-8 bg-white shadow-lg rounded-xl">
+        <div className="min-h-screen flex items-center justify-center bg-app-gradient">
+            <div className="w-full max-w-md p-8 space-y-8 glass shadow-2xl rounded-xl border border-white/10 animate-fade-in">
                 <div>
-                    <h2 className="text-3xl font-bold text-center text-brand-primary">
+                    <h2 className="text-3xl font-extrabold text-center text-gradient">
                         Bienvenido a EduComply
                     </h2>
-                    <p className="mt-2 text-sm text-center text-slate-500">
+                    <p className="mt-2 text-sm text-center text-slate-200/80">
                         Inicie sesión para continuar
                     </p>
                 </div>
                 <form className="space-y-6" onSubmit={handleLogin}>
                     <div className="flex flex-col gap-2">
-                        <label htmlFor="email" className="text-sm font-medium text-slate-700">
+                        <label htmlFor="email" className="text-sm font-medium text-slate-200">
                             Correo Electrónico
                         </label>
                         <input
@@ -40,13 +40,13 @@ const Auth: React.FC = () => {
                             type="email"
                             autoComplete="email"
                             required
-                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary"
+                            className="w-full px-3 py-2 border border-white/20 bg-white/10 text-slate-100 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary focus:border-transparent"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                         />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label htmlFor="password" className="text-sm font-medium text-slate-700">
+                        <label htmlFor="password" className="text-sm font-medium text-slate-200">
                             Contraseña
                         </label>
                         <input
@@ -55,13 +55,13 @@ const Auth: React.FC = () => {
                             type="password"
                             autoComplete="current-password"
                             required
-                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary"
+                            className="w-full px-3 py-2 border border-white/20 bg-white/10 text-slate-100 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary focus:border-transparent"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                         />
                     </div>
                     {error && (
-                         <div className="p-3 text-sm text-center text-red-800 bg-red-100 rounded-md">
+                         <div className="p-3 text-sm text-center text-white rounded-md state-gradient-error">
                             {error}
                         </div>
                     )}
@@ -69,7 +69,8 @@ const Auth: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-brand-secondary hover:bg-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary disabled:bg-slate-400"
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-blue-400/30 disabled:bg-slate-500/50"
+                            style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)'}}
                         >
                             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
                         </button>

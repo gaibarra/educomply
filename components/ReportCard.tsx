@@ -10,18 +10,19 @@ interface ReportCardProps {
 
 const ReportCard: React.FC<ReportCardProps> = ({ icon, title, description, onGenerate, isLoading = false }) => {
     return (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 flex flex-col items-start gap-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-            <div className="bg-brand-primary/10 p-4 rounded-full text-brand-primary">
+        <div className="glass p-6 rounded-xl shadow-xl border border-white/10 flex flex-col items-start gap-4 transition-all duration-300 hover-3d animate-floating">
+            <div className="p-4 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)' }}>
                 {icon}
             </div>
             <div className="flex-1">
-                <h3 className="text-xl font-bold text-slate-800">{title}</h3>
-                <p className="text-sm text-slate-500 mt-2 min-h-[40px]">{description}</p>
+                <h3 className="text-xl font-extrabold text-gradient">{title}</h3>
+                <p className="text-sm text-slate-200 mt-2 min-h-[40px]">{description}</p>
             </div>
             <button
                 onClick={onGenerate}
                 disabled={isLoading}
-                className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-brand-secondary rounded-lg hover:bg-brand-primary transition-all shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-400/50 disabled:bg-slate-400 disabled:cursor-not-allowed"
+                className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white rounded-lg transition-all shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-400/30 disabled:bg-slate-500/50 disabled:cursor-not-allowed animate-pulse-glow"
+                style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)' }}
             >
                 {isLoading ? (
                      <>
