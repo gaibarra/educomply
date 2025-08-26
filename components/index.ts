@@ -1,2 +1,2 @@
-// Barrel for components if needed later.
-export {};
+// Barrel for components
+export { default as AdminSuspendedTasks } from './AdminSuspendedTasks';

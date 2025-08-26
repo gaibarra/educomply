@@ -13,6 +13,7 @@ import InstitucionView from './components/InstitucionView';
 import ProyectosView from './components/ProyectosView';
 import UsersAdminView from './components/UsersAdminView';
 import GanttView from './components/GanttView';
+import AdminReprogramView from './components/AdminReprogramView';
 import Header from './components/Header';
 import { ToastProvider } from './components/ToastProvider';
 import Auth from './components/Auth';
@@ -189,7 +190,7 @@ const App: React.FC = () => {
 
     switch (activeView) {
       case 'dashboard':
-        return <Dashboard profile={profile} setActiveView={setActiveView} institutionProfile={institutionProfile} />;
+        return <Dashboard profile={profile} setActiveView={setActiveView} institutionProfile={institutionProfile} setTareasInitialKeyword={setTareasInitialKeyword} />;
       case 'gantt': {
         const inferDefaultCode = (inst?: InstitutionProfileRow | null) => {
           if (inst?.phone_country_code) return inst.phone_country_code;
@@ -227,8 +228,10 @@ const App: React.FC = () => {
         return <ProyectosView profile={profile} />;
       case 'usuarios':
         return <UsersAdminView profile={profile} />;
+      case 'reprogramar':
+        return <AdminReprogramView profile={profile} />;
       default:
-        return <Dashboard profile={profile} setActiveView={setActiveView} institutionProfile={institutionProfile} />;
+        return <Dashboard profile={profile} setActiveView={setActiveView} institutionProfile={institutionProfile} setTareasInitialKeyword={setTareasInitialKeyword} />;
     }
   };
 

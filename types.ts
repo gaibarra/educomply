@@ -2,7 +2,7 @@
 
 import type { Session as SupabaseSession } from '@supabase/supabase-js';
 
-export type View = 'dashboard' | 'normativas' | 'tareas' | 'auditorias' | 'reportes' | 'institucion' | 'proyectos' | 'usuarios' | 'gantt';
+export type View = 'dashboard' | 'normativas' | 'tareas' | 'auditorias' | 'reportes' | 'institucion' | 'proyectos' | 'usuarios' | 'gantt' | 'reprogramar';
 export type Session = SupabaseSession;
 
 // Define common enums/unions first
@@ -557,6 +557,11 @@ export interface Task {
   completed_by?: string | null;
   completed_at?: string | null;
   completed_by_profile?: SimpleProfile | null;
+  // Suspension metadata (optional, frontend-managed until DB migration adds persistent fields)
+  suspended?: boolean;
+  suspension_reason?: string | null;
+  suspended_by?: string | null;
+  suspended_at?: string | null;
 }
 
 export type TaskFromDb = TaskRow;

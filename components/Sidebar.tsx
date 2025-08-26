@@ -79,6 +79,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, profile })
               <UserAdminIcon />
             </NavItem>
           )}
+          {isAdmin && (
+            <NavItem view="reprogramar" label="Reprogramar tareas" activeView={activeView} onClick={setActiveView}>
+              <ShieldCheckIcon />
+            </NavItem>
+          )}
       <div className="my-4 border-t border-white/10"></div>
           <NavItem view="institucion" label="Institución" activeView={activeView} onClick={setActiveView}>
             <AcademicCapIcon />
