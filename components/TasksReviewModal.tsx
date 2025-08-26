@@ -13,7 +13,7 @@ import BuildingOfficeIcon from './icons/BuildingOfficeIcon';
 interface TasksReviewModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (tasks: Omit<TaskFromDb, 'id'|'created_at'>[]) => void;
+    onSave: (tasks: Omit<TaskFromDb, 'id'|'created_at'|'owner_id'|'project_id'>[]) => void;
     initialTasks: Omit<Task, 'id'|'created_at'|'subTasks'|'responsible_area'|'responsible_person'>[];
     availableAreas: ResponsibleArea[];
     availablePersons: Profile[];
@@ -46,8 +46,8 @@ const TasksReviewModal: React.FC<TasksReviewModalProps> = ({ isOpen, onClose, on
     };
 
     const handleSave = () => {
-        // Remove tempId and other non-db fields before saving
-        const finalTasks: Omit<TaskFromDb, 'id'|'created_at'>[] = editedTasks.map(t => ({
+    // Remove tempId and other non-db fields before saving
+    const finalTasks: Omit<TaskFromDb, 'id'|'created_at'|'owner_id'|'project_id'>[] = editedTasks.map(t => ({
             description: t.description,
             documents: t.documents,
             responsible_area_id: t.responsible_area_id!,

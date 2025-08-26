@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import KpiCard from './KpiCard';
 import ComplianceItemCard from './ComplianceItemCard';
+import SearchBar from './SearchBar';
 import { useToast } from './ToastProvider';
 import type { Kpi, ComplianceObligation, Profile, View, TaskOverallStatus, TaskScope, TaskFromDb } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -41,17 +42,19 @@ const getTaskStatus = (task: { scope: any | null; subTasks: { status: string }[]
 };
 
 
-const Dashboard: React.FC<{ profile: Profile; setActiveView: (view: View) => void; institutionProfile?: any | null }> = ({ profile, setActiveView }) => {
+const Dashboard: React.FC<{ profile: Profile; setActiveView: (view: View) => void; institutionProfile?: any | null; setTareasInitialKeyword?: (kw: string | null) => void }> = ({ profile, setActiveView, setTareasInitialKeyword }) => {
     const [kpis, setKpis] = useState<Kpi[]>([]);
     const [pendingObligations, setPendingObligations] = useState<ComplianceObligation[]>([]);
     const [page, setPage] = useState(0); // paginación para obligaciones críticas
-    const pageSize = 20;
+    const pageSize = 10;
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
-    const [obligationFilter, setObligationFilter] = useState<'Todas' | 'Pendiente' | 'Vencido'>('Todas');
+    const [obligationFilter] = useState<'Todas' | 'Pendiente' | 'Vencido'>('Todas');
     const removalTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
         const recentlyCompleted = useRef<Set<string>>(new Set());
     const toast = useToast();
+    const [query, setQuery] = useState('');
+    const [, setFiltersOpen] = useState(false);
 
     // Fetch data
     useEffect(() => {
@@ -196,38 +199,48 @@ const Dashboard: React.FC<{ profile: Profile; setActiveView: (view: View) => voi
         }
     };
 
-    // Reset page when filter changes
-    useEffect(() => { setPage(0); }, [obligationFilter]);
-
-    const filteredObligations = pendingObligations.filter(item => obligationFilter === 'Todas' || item.status === obligationFilter);
+    // Reset page when filter or query changes
+    useEffect(() => { setPage(0); }, [obligationFilter, query]);
+    const filteredObligations = pendingObligations.filter(item => {
+        if (!(obligationFilter === 'Todas' || item.status === obligationFilter)) return false;
+        if (!query) return true;
+        const q = query.toLowerCase();
+        return [item.name, item.category, item.authority].some(f => (f || '').toLowerCase().includes(q));
+    });
     const totalPages = Math.ceil(filteredObligations.length / pageSize) || 1;
     const pageItems = filteredObligations.slice(page * pageSize, page * pageSize + pageSize);
 
+    
+
     return (
-        <div className="p-6 md:p-8">
-            <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="p-4 md:p-8">
+            <div className="mb-6 flex items-start justify-between">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-gradient mb-2">Dashboard de Cumplimiento</h2>
-                    <p className="text-slate-300">Resumen del estado de cumplimiento de la institución.</p>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-gradient mb-1">Dashboard de Cumplimiento</h2>
+                    <p className="text-slate-300 text-sm">Resumen del estado de cumplimiento de la institución.</p>
                 </div>
                 <div className="hidden md:flex gap-2">
                     <button
-                        onClick={() => setActiveView('tareas')}
-                        className="px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-95 transition-colors"
+                        onClick={() => {
+                            const kw = query || (obligationFilter !== 'Todas' ? obligationFilter : '');
+                            setTareasInitialKeyword?.(kw || null);
+                            setActiveView('tareas');
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-sm font-semibold text-white hover:opacity-95 transition-colors"
                         style={{ background: 'linear-gradient(135deg, #22c55e, #3b82f6)' }}
                     >
                         Ver Tareas
                     </button>
                     <button
                         onClick={() => setActiveView('gantt')}
-                        className="px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-95 transition-colors"
+                        className="px-3 py-1.5 rounded-lg text-sm font-semibold text-white hover:opacity-95 transition-colors"
                         style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }}
                     >
                         Gráfica de Gantt
                     </button>
                     <button
                         onClick={() => setActiveView('reportes')}
-                        className="px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-95 transition-colors"
+                        className="px-3 py-1.5 rounded-lg text-sm font-semibold text-white hover:opacity-95 transition-colors"
                         style={{ background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)' }}
                     >
                         Generar Reporte
@@ -248,81 +261,90 @@ const Dashboard: React.FC<{ profile: Profile; setActiveView: (view: View) => voi
                 </div>
             ) : (
                 <>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                                                {kpis.map((kpi, index) => (
-                                                        <KpiCard key={kpi.title} kpi={kpi} icon={icons[index % icons.length]} />
-                                                ))}
-                                                <div className="col-span-1 sm:col-span-2 lg:col-span-1">
-                                                    <ReminderList className="glass p-4 rounded-xl border border-white/10" />
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                                <main className="col-span-12 lg:col-span-8">
+                                                <div className="glass p-3 md:p-4 rounded-xl border border-white/12 sticky top-6 z-20 mb-4 backdrop-blur-sm">
+                                                    <SearchBar query={query} setQuery={setQuery} onOpenFilters={() => setFiltersOpen(true)} />
                                                 </div>
-                                        </div>
-                    <div className="glass p-6 rounded-xl shadow-md border border-white/10">
-                        <div className="flex items-center justify-between gap-4 mb-4">
-                            <h3 className="text-xl font-bold text-slate-100">Obligaciones Críticas Próximas</h3>
-                            <div className="flex gap-2 bg-white/5 border border-white/10 rounded-full p-1">
-                                {(['Todas', 'Pendiente', 'Vencido'] as const).map(opt => (
-                                    <button
-                                        key={opt}
-                                        onClick={() => setObligationFilter(opt)}
-                                        className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${obligationFilter === opt ? 'text-white' : 'text-slate-300'}`}
-                                        style={obligationFilter === opt ? { background: 'linear-gradient(135deg, #3b82f6, #06b6d4)' } : {}}
-                                    >
-                                        {opt}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                                                <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
+                                                <div className="glass p-6 rounded-xl shadow-md border border-white/12 bg-gradient-to-b from-black/30 to-transparent">
+                                                    <div className="flex items-center justify-between gap-4 mb-4">
+                                                        <h3 className="text-lg font-bold text-slate-100">Obligaciones Críticas Próximas</h3>
+                                                    </div>
+                                                    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                                                         {pageItems.length > 0 ? (
-                                                                pageItems.map(item => (
-                                                                        <ComplianceItemCard
-                                                                                key={item.id}
-                                                                                item={item}
-                                                                                recentlyCompleted={recentlyCompleted.current.has(item.id)}
-                                                                                onCompleted={(wasStatus, undoFn) => handleCompleted(item, wasStatus, undoFn)}
-                                                                        />
+                                                            pageItems
+                                                                .filter(item => {
+                                                                    if (!query) return true;
+                                                                    const q = query.toLowerCase();
+                                                                    return [item.name, item.category, item.authority].some(f => (f || '').toLowerCase().includes(q));
+                                                                })
+                                                                .map(item => (
+                                                                    <ComplianceItemCard
+                                                                        key={item.id}
+                                                                        item={item}
+                                                                        recentlyCompleted={recentlyCompleted.current.has(item.id)}
+                                                                        onCompleted={(wasStatus, undoFn) => handleCompleted(item, wasStatus, undoFn)}
+                                                                    />
                                                                 ))
                                                         ) : (
-                                <p className="text-slate-300 text-center p-4">¡Felicidades! No hay obligaciones críticas pendientes.</p>
-                            )}
-                        </div>
-                                                {filteredObligations.length > pageSize && (
-                                                    <div className="flex items-center justify-between mt-4 text-xs text-slate-300 gap-4 flex-wrap">
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                onClick={() => setPage(p => Math.max(0, p - 1))}
-                                                                disabled={page === 0}
-                                                                className={`px-3 py-1 rounded-md font-medium border border-white/10 transition-colors ${page === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
-                                                            >Anterior</button>
-                                                            <span className="px-2">Página {page + 1} de {totalPages}</span>
-                                                            <button
-                                                                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                                                                disabled={page + 1 >= totalPages}
-                                                                className={`px-3 py-1 rounded-md font-medium border border-white/10 transition-colors ${(page + 1 >= totalPages) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
-                                                            >Siguiente</button>
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {Array.from({ length: totalPages }, (_, i) => (
+                                                            <p className="text-slate-300 text-center p-4">¡Felicidades! No hay obligaciones críticas pendientes.</p>
+                                                        )}
+                                                    </div>
+                                                    {filteredObligations.length > pageSize && (
+                                                        <div className="flex items-center justify-between mt-4 text-xs text-slate-300 gap-4 flex-wrap">
+                                                            <div className="flex items-center gap-2">
                                                                 <button
-                                                                    key={i}
-                                                                    onClick={() => setPage(i)}
-                                                                    className={`w-7 h-7 rounded-md text-[11px] font-semibold border border-white/10 ${i === page ? 'bg-gradient-to-r from-brand-primary to-brand-secondary text-white' : 'text-slate-300 hover:bg-white/10'}`}
-                                                                    aria-label={`Ir a la página ${i+1}`}
-                                                                >{i + 1}</button>
+                                                                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                                                                    disabled={page === 0}
+                                                                    className={`px-3 py-1 rounded-md font-medium border border-white/10 transition-colors ${page === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
+                                                                >Anterior</button>
+                                                                <span className="px-2">Página {page + 1} de {totalPages}</span>
+                                                                <button
+                                                                    onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                                                                    disabled={page + 1 >= totalPages}
+                                                                    className={`px-3 py-1 rounded-md font-medium border border-white/10 transition-colors ${(page + 1 >= totalPages) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
+                                                                >Siguiente</button>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {Array.from({ length: totalPages }, (_, i) => (
+                                                                    <button
+                                                                        key={i}
+                                                                        onClick={() => setPage(i)}
+                                                                        className={`w-7 h-7 rounded-md text-[11px] font-semibold border border-white/10 ${i === page ? 'bg-gradient-to-r from-brand-primary to-brand-secondary text-white' : 'text-slate-300 hover:bg-white/10'}`}
+                                                                        aria-label={`Ir a la página ${i+1}`}
+                                                                    >{i + 1}</button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    <div className="text-right mt-4">
+                                                        <button
+                                                            onClick={() => {
+                                                                const kw = query || (obligationFilter !== 'Todas' ? obligationFilter : '');
+                                                                setTareasInitialKeyword?.(kw || null);
+                                                                setActiveView('tareas');
+                                                            }}
+                                                            className="text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+                                                            style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)' }}
+                                                        >
+                                                            Ir a tareas →
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </main>
+                                            <aside className="col-span-12 lg:col-span-4">
+                                                <div className="space-y-6">
+                                                    <div className="glass p-4 rounded-xl border border-white/10">
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            {kpis.map((kpi, index) => (
+                                                                <KpiCard key={kpi.title} kpi={kpi} icon={icons[index % icons.length]} />
                                                             ))}
                                                         </div>
                                                     </div>
-                                                )}
-                        <div className="text-right mt-4">
-                            <button
-                                onClick={() => setActiveView('tareas')}
-                                className="text-white font-semibold px-4 py-2 rounded-lg transition-colors"
-                                style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)' }}
-                            >
-                                Ver todas las tareas →
-                            </button>
-                        </div>
-                    </div>
+                                                    <ReminderList className="glass p-4 rounded-xl border border-white/10" />
+                                                </div>
+                                            </aside>
+                                        </div>
                 </>
             )}
         </div>

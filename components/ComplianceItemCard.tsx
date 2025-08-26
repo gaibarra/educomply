@@ -18,10 +18,10 @@ const getStatusClasses = (status: ComplianceObligation['status']) => {
   }
 };
 
-const ComplianceItemCard: React.FC<{ item: ComplianceObligation; onCompleted?: (prevStatus: ComplianceObligation['status'], undo?: ()=>void) => void; }> = ({ item, onCompleted }) => {
+const ComplianceItemCard: React.FC<{ item: ComplianceObligation; onCompleted?: (prevStatus: ComplianceObligation['status'], undo?: ()=>void) => void; recentlyCompleted?: boolean }> = ({ item, onCompleted, recentlyCompleted }) => {
   const [open, setOpen] = useState(false);
   const [localStatus] = useState<ComplianceObligation['status']>(item.status);
-  const [anim, setAnim] = useState<'pulse'|'done'|null>(null);
+  const [anim, setAnim] = useState<'pulse'|'done'|null>(recentlyCompleted ? 'done' : null);
   const [showHistory, setShowHistory] = useState(false);
   const menuRef = useRef<HTMLDivElement|null>(null);
   const triggerRef = useRef<HTMLButtonElement|null>(null);
@@ -104,7 +104,7 @@ const ComplianceItemCard: React.FC<{ item: ComplianceObligation; onCompleted?: (
   };
 
   return (
-    <div className={`glass p-4 rounded-lg shadow-sm border-l-4 border-brand-secondary flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 border border-white/10 relative transition z-10 ${open ? 'overflow-visible' : ''} ${anim==='pulse'?'animate-pulse':''} ${anim==='done'?'ring-2 ring-emerald-400/60':''}`}>
+    <div className={`glass p-4 rounded-lg shadow-sm border-l-4 border-brand-secondary flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 border border-white/10 relative transition z-10 ${open ? 'overflow-visible' : ''} ${anim==='pulse'?'animate-pulse':''} ${anim==='done'?'ring-2 ring-emerald-400/60':''} font-sans`}>
       <div className="flex-1">
         <h3 className="font-bold text-slate-100 text-lg">{item.name}</h3>
         <div className="flex items-center space-x-4 mt-2 text-sm text-slate-300">

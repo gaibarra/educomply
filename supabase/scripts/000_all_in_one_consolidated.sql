@@ -165,7 +165,7 @@ returns trigger
 language plpgsql
 as $$
 begin
-  NEW.updated_at = now();
+  NEW.updated_at := now();
   return NEW;
 end;
 $$;

@@ -55,7 +55,8 @@ const ReportDisplayModal: React.FC<ReportDisplayModalProps> = ({ isOpen, onClose
                                 body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                                 .no-print { display: none; }
                             }
-                            body { font-family: sans-serif; }
+                            /* Use the app's Inter font stack for print to match the sidebar and global UI */
+                            body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; }
                         </style>
                     </head>
                     <body class="p-8">

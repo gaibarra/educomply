@@ -154,7 +154,7 @@ const SubTaskItem: React.FC<SubTaskItemProps> = ({ subTask, onUpdate, onDelete, 
     const isCompleted = subTask.status === 'Completada';
     
     return (
-        <div className="relative group">
+        <div className="relative group font-sans">
             {!isLastItem && <div className="absolute left-[13px] top-7 h-full w-0.5 bg-white/10" />}
 
             <div className="relative flex items-start gap-x-4 py-2">

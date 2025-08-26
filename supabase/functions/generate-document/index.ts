@@ -27,7 +27,21 @@ function decodeJwt(token:string){
 }
 
 Deno.serve(async (req: Request) => {
+  // Build base CORS headers. We'll conditionally override Allow-Origin to echo the request origin
+  // in development or when explicitly allowed via env (ALLOW_ECHO_ORIGIN=true) to avoid mismatches
+  // between ports (e.g., localhost:5173 vs localhost:5175).
   const corsHeaders = buildCorsHeadersForRequest(req, { 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
+  const requestOrigin = req.headers.get('origin') || '';
+  try {
+    const denoEnv: any = Deno.env;
+    const allowedRaw = (denoEnv.get('ALLOWED_ORIGIN') || '*').toString();
+    const allowEcho = allowedRaw === '*' || allowedRaw.includes('localhost') || (denoEnv.get('ALLOW_ECHO_ORIGIN') || '').toString() === 'true';
+    if (allowEcho && requestOrigin) {
+      corsHeaders['Access-Control-Allow-Origin'] = requestOrigin;
+    }
+  } catch (e) {
+    // If reading env fails for any reason, silently continue with existing headers
+  }
   if (req.method === 'OPTIONS') {
     log('debug','[generate-document] Preflight OPTIONS recibido');
     return new Response('ok',{headers:corsHeaders});
@@ -93,8 +107,44 @@ Idioma: ${language === 'en' ? 'English' : 'Español'}.
     return new Response(JSON.stringify({error:'Fallo al generar documento'}),{status:502,headers:{...corsHeaders,'Content-Type':'application/json'}});
   }
 
-  const tryParse = (raw:string)=>{ try { return JSON.parse(raw); } catch { const m=raw.match(/\{[\s\S]*\}/); if(m) { try { return JSON.parse(m[0]); } catch { return null; } } return null; }; };
-  const json = tryParse(text);
+  const tryParse = (raw: string) => {
+    try { return JSON.parse(raw); } catch { /* continue to heuristics */ }
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (m) {
+      try { return JSON.parse(m[0]); } catch { /* ignore */ }
+    }
+    return null;
+  };
+
+  // Strip common fenced code blocks and attempt parsing
+  const stripped = text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+  let json: any = tryParse(stripped) || null;
+  if (!json) {
+    const mJsonFence = text.match(/```json\s*([\s\S]*?)```/i);
+    if (mJsonFence) json = tryParse(mJsonFence[1]);
+  }
+  if (!json) json = tryParse(text);
+
+  // If the model returned markdown-like text (no JSON), accept it as body_markdown
+  const looksLikeMarkdown = /(^\s?#\s+|^\s?##\s+|\bIntroducci[oó]n\b|\bFundamento\b|\bProcedimiento\b)/im.test(text);
+  if (!json && looksLikeMarkdown) {
+    const filenameSafe = docName.toLowerCase().replace(/[^a-z0-9-_]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'') + '.md';
+    const response = {
+      filename: filenameSafe,
+      title: docName,
+      summary: '',
+      body_markdown: stripped.trim() || text.trim(),
+      sources: [],
+      disclaimer: 'Este documento es generado por IA y debe ser validado contra fuentes oficiales antes de su uso formal.'
+    };
+    return new Response(JSON.stringify(response),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  }
+
+  // Map alternative fields to body_markdown if present
+  if (json && !json.body_markdown) {
+    json.body_markdown = json.body || json.markdown || json.content || json.text || null;
+  }
+
   if (!json || !json.body_markdown) {
     return new Response(JSON.stringify({error:'Salida IA inválida', raw:text.slice(0,4000)}),{status:500,headers:{...corsHeaders,'Content-Type':'application/json'}});
   }

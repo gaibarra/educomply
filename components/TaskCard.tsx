@@ -10,13 +10,14 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Task, SubTask, TaskOverallStatus, Profile, Database, TaskScope } from '../types';
-import SubTaskItem from './SubTaskItem';
-import PlusCircleIcon from './icons/PlusCircleIcon';
+import SubtaskList from './SubtaskList';
+import DocumentPreviewModal from './DocumentPreviewModal';
 import DocumentTextIcon from './icons/DocumentTextIcon';
 import DownloadIcon from './icons/DownloadIcon';
 import SubTaskSuggestionModal from './SubTaskSuggestionModal';
 import BuildingOfficeIcon from './icons/BuildingOfficeIcon';
 import { useToast } from './ToastProvider';
+import SuspendTaskModal from './SuspendTaskModal';
 
 interface TaskCardProps {
     task: Task;
@@ -61,6 +62,7 @@ const getTaskStatus = (task: Task): TaskOverallStatus => {
 const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMembers, currentUserProfile }) => {
     const [isExpanded, setIsExpanded] = useState(true);
     const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
+    const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
     const toast = useToast();
 
     const handleAddSubTask = () => {
@@ -131,19 +133,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
         }
     };
     
+    const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+    const [previewOpen, setPreviewOpen] = useState(false);
+
     const handleDownloadDocument = async (docName: string) => {
-        const buildAndDownload = (json: any) => {
-            const md = `# ${json.title}\n\n${json.summary}\n\n${json.body_markdown}\n\n---\nSources:\n${(json.sources||[]).map((s:any)=>`- ${s.citation}${s.url?` (${s.url})`:''}`).join('\n')}\n\n> ${json.disclaimer}`;
-            const blob = new Blob([md], { type: 'text/markdown' });
-            const dlName = (json.filename || docName.replace(/[\s/]/g,'_') + '.md');
-            const urlObj = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = urlObj;
-            a.download = dlName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(urlObj);
+        const buildAndOpenPreview = (json: any) => {
+            setPreviewDoc({ ...json });
+            setPreviewOpen(true);
         };
         const payload = {
             docName,
@@ -152,7 +148,17 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
             source: (task.scope as TaskScope)?.source || '',
             language: 'es'
         };
+        let processingToastId: string | null = null;
+        const controller = new AbortController();
         try {
+            // show persistent processing toast with Cancel action
+            processingToastId = toast.addToast('processing', 'Procesando Compliance del Documento.....', 0, {
+                label: 'Cancelar',
+                onClick: () => {
+                    try { controller.abort(); } catch { /* ignore */ }
+                    if (processingToastId) toast.removeToast(processingToastId);
+                }
+            });
             const session = await supabase.auth.getSession();
             const token = session.data.session?.access_token;
             const anonKey = (supabase as any).anonKey || import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -168,24 +174,57 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                         'apikey': anonKey,
                         'Authorization': `Bearer ${token || anonKey}`
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 });
                 text = await res.text();
                 if (!res.ok) throw new Error(`HTTP ${res.status} ${text.slice(0,120)}`);
                 const json = JSON.parse(text);
-                buildAndDownload(json);
+                buildAndOpenPreview(json);
+                // remove processing toast on success after brief delay for smoothness
+                if (processingToastId) setTimeout(() => toast.removeToast(processingToastId!), 800);
                 return;
             } catch (primaryErr) {
                 console.warn('[generate-document] fetch directo falló, intento invoke()', primaryErr);
             }
             // Fallback a invoke estándar (maneja CORS internamente)
-            const { data, error } = await (supabase as any).functions.invoke('generate-document', { body: payload });
+            // supabase functions.invoke has no AbortController signal; create abortable promise
+            const invokePromise = (supabase as any).functions.invoke('generate-document', { body: payload });
+            const abortPromise = new Promise((_, rej) => {
+                controller.signal.addEventListener('abort', () => rej(new Error('aborted')));
+            });
+            const { data, error } = await Promise.race([invokePromise, abortPromise]) as any;
             if (error) throw error;
-            buildAndDownload(data);
+            buildAndOpenPreview(data);
+            // remove processing toast on success after brief delay for smoothness
+            if (processingToastId) setTimeout(() => toast.removeToast(processingToastId!), 800);
         } catch (e:any) {
             console.error('Fallo generando documento', e);
-            alert('No se pudo generar el documento.');
+            if (processingToastId) toast.removeToast(processingToastId);
+            if (e?.message === 'aborted') {
+                toast.addToast('info', 'Generación cancelada', 3000);
+            } else {
+                toast.addToast('error', 'Error generando documento', 6000);
+                alert('No se pudo generar el documento.');
+            }
         }
+    };
+
+    const doDownloadFromPreview = (json: any) => {
+        if (!json) return;
+        const md = `# ${json.title}\n\n${json.summary}\n\n${json.body_markdown}\n\n---\nSources:\n${(json.sources||[]).map((s:any)=>`- ${s.citation}${s.url?` (${s.url})`:''}`).join('\n')}\n\n> ${json.disclaimer}`;
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const dlName = (json.filename || 'document.md');
+        const urlObj = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = urlObj;
+        a.download = dlName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(urlObj);
+        setPreviewOpen(false);
+        setPreviewDoc(null);
     };
 
     const progress = task.subTasks.length > 0 
@@ -205,7 +244,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
 
     return (
         <>
-        <div className="glass rounded-xl shadow-xl transition-all duration-300 hover-3d">
+        <div className="glass rounded-xl shadow-xl transition-all duration-300 hover-3d font-sans">
             <div className="p-5 border-b border-white/10 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
                 <div className="flex justify-between items-start gap-4">
                     <div className="flex-1">
@@ -215,7 +254,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                                 {status}
                             </span>
                         </div>
-                        <h3 className="text-xl font-extrabold text-slate-100 mt-2">{task.description}</h3>
+                        <h3 className="text-lg font-bold text-slate-100 mt-2">{task.description}</h3>
                          <div className="flex items-center gap-4 flex-wrap text-sm text-slate-300 mt-1">
                             <span>Fuente: {task.scope?.source ?? 'No especificada'}</span>
                             {task.scope && task.scope.level !== 'Institución' && (
@@ -252,6 +291,15 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                         </p>
                     </div>
                 </div>
+                {currentUserProfile.role === 'admin' && (
+                    <div className="p-4 border-t border-white/6 flex items-center justify-end gap-3">
+                        {!task.suspended ? (
+                            <button onClick={() => setIsSuspendModalOpen(true)} className="px-3 py-1 rounded-md bg-amber-400 text-white font-semibold">Suspender</button>
+                        ) : (
+                            <span className="px-3 py-1 rounded-md bg-emerald-700 text-white font-semibold">Suspendida</span>
+                        )}
+                    </div>
+                )}
                  <div className="mt-4">
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-sm font-medium text-slate-300">Progreso</span>
@@ -349,31 +397,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                     )}
                     
                     <div>
-                        <h4 className="text-lg font-semibold text-slate-100 mb-3">Plan de Acción y Sub-tareas</h4>
-                        <div className="rounded-lg border bg-sky-400/10 border-sky-400/20 p-3">
-                            <div className="flex flex-col">
-                                {task.subTasks.map((subtask, index) => (
-                                    <SubTaskItem 
-                                        key={subtask.id} 
-                                        subTask={subtask} 
-                                        onUpdate={handleUpdateSubTask}
-                                        onDelete={handleDeleteSubTask}
-                                        availableTeamMembers={availableTeamMembers}
-                                        isLastItem={index === task.subTasks.length - 1}
-                                        currentUserProfile={currentUserProfile}
-                                    />
-                                ))}
-                            </div>
-                            <div className="mt-4 pt-3 border-t border-white/10">
-                                <button 
-                                    onClick={handleAddSubTask}
-                                    className="flex items-center gap-2 text-sm font-semibold text-slate-100 hover:text-white transition-colors"
-                                >
-                                    <PlusCircleIcon className="w-5 h-5"/>
-                                    Agregar Sub-tarea
-                                </button>
-                            </div>
-                        </div>
+                        <SubtaskList
+                            subtasks={task.subTasks}
+                            onUpdateSubtask={handleUpdateSubTask}
+                            onDeleteSubtask={handleDeleteSubTask}
+                            onAdd={handleAddSubTask}
+                            availableTeamMembers={availableTeamMembers}
+                            currentUserProfile={currentUserProfile}
+                        />
                     </div>
                 </div>
             )}
@@ -387,6 +418,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                 taskCategory={taskCategory}
             />
         )}
+        {isSuspendModalOpen && (
+            <SuspendTaskModal isOpen={isSuspendModalOpen} onClose={() => setIsSuspendModalOpen(false)} task={task} onSuspend={(updated) => { onUpdateTask(updated); setIsSuspendModalOpen(false); }} />
+        )}
+        <DocumentPreviewModal open={previewOpen} onClose={() => { setPreviewOpen(false); setPreviewDoc(null); }} doc={previewDoc} onDownload={doDownloadFromPreview} />
         </>
     );
 };

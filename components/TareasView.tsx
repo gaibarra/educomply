@@ -55,6 +55,12 @@ const TareasView: React.FC<{ profile: Profile; initialKeyword?: string }> = ({ p
         responsiblePerson: 'Todos', status: 'Todos', dueDateStart: '',
         dueDateEnd: '', scopeLevel: 'Todos', scopeEntity: '',
     };
+    // A canonical default that does NOT inherit any external keyword or state.
+    const defaultFilters: TaskFiltersType = {
+        keyword: '', category: 'Todos', responsibleArea: 'Todos',
+        responsiblePerson: 'Todos', status: 'Todos', dueDateStart: '',
+        dueDateEnd: '', scopeLevel: 'Todos', scopeEntity: '',
+    };
     
     const [filters, setFilters] = useState<TaskFiltersType>(initialFilters);
     const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
@@ -325,7 +331,11 @@ const TareasView: React.FC<{ profile: Profile; initialKeyword?: string }> = ({ p
             <TaskFilters 
                 filters={filters}
                 onFiltersChange={setFilters}
-                onClearFilters={() => setFilters(initialFilters)}
+                onClearFilters={() => {
+                    // Clear everything including inherited values (initialKeyword) and project selection
+                    setFilters(defaultFilters);
+                    setSelectedProjectId('Todos');
+                }}
                 availableCategories={availableFilterOptions.categories}
                 availableAreas={availableFilterOptions.areas.map(a => ({ id: String(a.id), name: a.name }))}
                 availablePersons={availableFilterOptions.persons.map(p => ({ id: p.id, name: p.full_name }))}

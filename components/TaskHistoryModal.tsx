@@ -209,41 +209,6 @@ const TaskHistoryModal: React.FC<TaskHistoryModalProps> = ({ taskId, isOpen, onC
 
   const recommendation = useMemo(() => buildRecommendation(events, dueDate), [events, dueDate]);
 
-  // Build shareable plain-text summary (memoized)
-  const shareSummary = useMemo(() => {
-    const header = `Historial de Actividad - Tarea ${taskId}`;
-    const rec = (aiRecommendation || recommendation) || '';
-    const eventLines = events.slice(-10).map(e => {
-      const ts = new Date(e.ts).toLocaleString();
-      return `• [${ts}] ${e.title}${e.detail ? ': ' + e.detail.replace(/\n+/g,' ') : ''}`;
-    });
-    return [header, '', 'Últimos eventos:', ...eventLines, '', 'Recomendación:', rec].join('\n');
-  }, [taskId, events, aiRecommendation, recommendation]);
-
-  const openWindowSafe = (url: string) => {
-    try { window.open(url, '_blank', 'noopener,noreferrer'); } catch {/* ignore */}
-  };
-
-  const handleSendEmail = useCallback(() => {
-    const subject = encodeURIComponent(`Historial Tarea ${taskId}`);
-    const body = encodeURIComponent(shareSummary);
-    const mailto = `mailto:?subject=${subject}&body=${body}`;
-    openWindowSafe(mailto);
-  }, [shareSummary, taskId]);
-
-  const handleSendWhatsApp = useCallback(() => {
-    const text = encodeURIComponent(shareSummary);
-    const url = `https://wa.me/?text=${text}`;
-    openWindowSafe(url);
-  }, [shareSummary]);
-
-  const handleSendTelegram = useCallback(() => {
-    const text = encodeURIComponent(shareSummary);
-    // If there is a canonical app URL for the task it could be appended as &url=...
-    const url = `https://t.me/share/url?text=${text}`;
-    openWindowSafe(url);
-  }, [shareSummary]);
-
   if (!isOpen) return null;
 
   const modalContent = (
@@ -329,16 +294,7 @@ const TaskHistoryModal: React.FC<TaskHistoryModalProps> = ({ taskId, isOpen, onC
           )}
         </div>
         {/* Footer */}
-        <div className="px-6 md:px-8 py-4 border-t border-white/10 flex flex-wrap gap-3 justify-end rounded-b-2xl bg-slate-900/40">
-          <button onClick={handleSendEmail} className="px-4 py-2 text-xs md:text-sm font-medium rounded-lg bg-slate-700/60 text-slate-100 hover:bg-slate-600/70 border border-slate-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/60 transition">
-            Enviar por Email
-          </button>
-          <button onClick={handleSendWhatsApp} className="px-4 py-2 text-xs md:text-sm font-medium rounded-lg bg-emerald-600/80 text-white hover:bg-emerald-600 border border-emerald-400/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 transition">
-            Enviar WhatsApp
-          </button>
-          <button onClick={handleSendTelegram} className="px-4 py-2 text-xs md:text-sm font-medium rounded-lg bg-sky-600/80 text-white hover:bg-sky-600 border border-sky-400/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 transition">
-            Enviar Telegram
-          </button>
+        <div className="px-6 md:px-8 py-4 border-t border-white/10 flex justify-end rounded-b-2xl bg-slate-900/40">
           <button onClick={onClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-brand-primary to-brand-secondary text-white hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/60 transition">
             Cerrar
           </button>

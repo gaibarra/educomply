@@ -4,8 +4,8 @@ returns trigger
 language plpgsql
 as $$
 begin
-  new.updated_at = now();
-  return new;
+  NEW.updated_at := now();
+  return NEW;
 end;
 $$;
 
