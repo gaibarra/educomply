@@ -19,10 +19,10 @@ const Header: React.FC<HeaderProps> = ({ profile, institutionProfile }) => {
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   return (
-    <header className="glass shadow-lg p-4 flex items-center z-10">
+    <header className="bg-gray-900/80 backdrop-blur-sm shadow-lg p-4 flex items-center z-10 border-b border-gray-700">
       {/* Spacer left */}
       <div className="flex-1 hidden sm:block" />
-      <h1 className="flex-1 text-center text-2xl font-extrabold text-gradient truncate" title={institutionProfile?.name || 'EduComply'}>
+      <h1 className="flex-1 text-center text-2xl font-extrabold text-gray-100 truncate" title={institutionProfile?.name || 'EduComply'}>
         {institutionProfile?.name || 'EduComply'}
       </h1>
       <div className="flex-1 flex items-center justify-end space-x-4">
@@ -36,12 +36,12 @@ const Header: React.FC<HeaderProps> = ({ profile, institutionProfile }) => {
         <div className="flex items-center space-x-3">
           <UserCircleIcon className="h-10 w-10 text-slate-400" />
           <div>
-            <p className="font-semibold text-sm text-slate-100">{profile?.full_name || 'Usuario'}</p>
-            <p className="text-xs text-slate-300">{profile ? capitalize(profile.role.replace('_', ' de ')) : 'Rol no definido'}</p>
+            <p className="font-semibold text-sm text-gray-100">{profile?.full_name || 'Usuario'}</p>
+            <p className="text-xs text-gray-400">{profile ? capitalize(profile.role.replace('_', ' de ')) : 'Rol no definido'}</p>
           </div>
           <button 
             onClick={handleSignOut}
-            className="p-2 text-slate-200 hover:bg-white/10 hover:text-primary rounded-full transition-colors"
+            className="p-2 text-gray-400 hover:bg-gray-700 hover:text-white rounded-full transition-colors"
             aria-label="Cerrar sesión"
           >
             <ArrowRightOnRectangleIcon className="w-6 h-6" />

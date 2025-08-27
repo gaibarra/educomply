@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
   if (!newUserId) return new Response(JSON.stringify({error:'No se obtuvo id del nuevo usuario'}),{status:500,headers:{...corsHeaders,'Content-Type':'application/json'}});
 
   // Insert profile row
-  const { error: profErr } = await supabase.from('profiles').insert({ id: newUserId, full_name, role, scope_entity: null, mobile, position, campus, area });
+  const { error: profErr } = await supabase.from('profiles').insert({ id: newUserId, email, full_name, role, scope_entity: null, mobile, position, campus, area });
   if (profErr) return new Response(JSON.stringify({error:profErr.message}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
 
   return new Response(JSON.stringify({ ok: true, user_id: newUserId }),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});

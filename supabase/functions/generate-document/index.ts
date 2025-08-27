@@ -12,7 +12,7 @@ const levelOrder: Record<string, number> = { debug:10, info:20, warn:30, error:4
 const currentLevel = levelOrder[LOG_LEVEL] ?? 20;
 const log = (lvl: keyof typeof levelOrder, ...a:any[]) => { if (currentLevel <= levelOrder[lvl]) console.log(`[${lvl.toUpperCase()}]`, ...a); };
 
-import { buildCorsHeadersForRequest } from "../_shared/cors.ts";
+// No se usa el helper de CORS compartido para que la lógica sea más clara y autocontenida.
 
 interface GenDocRequest {
   docName: string;
@@ -27,24 +27,30 @@ function decodeJwt(token:string){
 }
 
 Deno.serve(async (req: Request) => {
-  // Build base CORS headers. We'll conditionally override Allow-Origin to echo the request origin
-  // in development or when explicitly allowed via env (ALLOW_ECHO_ORIGIN=true) to avoid mismatches
-  // between ports (e.g., localhost:5173 vs localhost:5175).
-  const corsHeaders = buildCorsHeadersForRequest(req, { 'Access-Control-Allow-Methods': 'POST,OPTIONS' });
   const requestOrigin = req.headers.get('origin') || '';
-  try {
-    const denoEnv: any = Deno.env;
-    const allowedRaw = (denoEnv.get('ALLOWED_ORIGIN') || '*').toString();
-    const allowEcho = allowedRaw === '*' || allowedRaw.includes('localhost') || (denoEnv.get('ALLOW_ECHO_ORIGIN') || '').toString() === 'true';
-    if (allowEcho && requestOrigin) {
-      corsHeaders['Access-Control-Allow-Origin'] = requestOrigin;
-    }
-  } catch (e) {
-    // If reading env fails for any reason, silently continue with existing headers
+
+  // --- Manejo de CORS ---
+  // Esta lógica es crucial para el desarrollo local, donde el puerto del frontend
+  // (p. ej., 5173, 5175) puede ser diferente del configurado en las variables de entorno.
+  const corsHeaders: Record<string, string> = {
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+
+  const allowedOrigin = Deno.env.get('ALLOWED_ORIGIN') || '';
+  if (allowedOrigin === '*') {
+    corsHeaders['Access-Control-Allow-Origin'] = '*';
+  } else if (requestOrigin.includes('localhost')) {
+    // Para desarrollo local, siempre se hace eco del origen para evitar problemas de puertos.
+    corsHeaders['Access-Control-Allow-Origin'] = requestOrigin;
+  } else if (allowedOrigin) {
+    // Para producción, se usa el origen específico configurado.
+    corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
   }
+
   if (req.method === 'OPTIONS') {
-    log('debug','[generate-document] Preflight OPTIONS recibido');
-    return new Response('ok',{headers:corsHeaders});
+    log('debug', '[generate-document] Preflight OPTIONS recibido, respondiendo con cabeceras:', corsHeaders);
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({error:'Use POST'}),{status:405,headers:{...corsHeaders,'Content-Type':'application/json'}});
@@ -158,5 +164,7 @@ Idioma: ${language === 'en' ? 'English' : 'Español'}.
     sources: Array.isArray(json.sources) ? json.sources.slice(0,10) : [],
     disclaimer: json.disclaimer || 'Este documento es generado por IA y debe ser validado contra fuentes oficiales antes de su uso formal.'
   };
+  // Debug: log cors headers when in debug level to help verify CORS during dev
+  if (currentLevel <= levelOrder.debug) log('debug','[generate-document] returning with CORS headers', corsHeaders);
   return new Response(JSON.stringify(response),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});
 });

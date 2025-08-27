@@ -13,15 +13,23 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- 2) Tablas principales
+-- 2) Tablas principales (idempotente)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name text,
-  email text UNIQUE,
   role user_role DEFAULT 'usuario',
-  metadata jsonb DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now()
+  metadata jsonb DEFAULT '{}'::jsonb, -- For any other unstructured data
+  created_at timestamptz NOT NULL DEFAULT now() -- Auditing
 );
+
+-- Asegurar que las columnas existan en la tabla de perfiles para evitar errores
+-- en instalaciones parciales o actualizaciones.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email text UNIQUE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS scope_entity text NULL; -- e.g., 'Campus Norte'
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS mobile text NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS position text NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS campus text NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS area text NULL;
 
 CREATE TABLE IF NOT EXISTS public.tasks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -188,8 +196,14 @@ GRANT EXECUTE ON FUNCTION public.reopen_task(uuid) TO service_role;
 
 -- --------------------------------------------------
 -- Administración: tareas suspendidas pendientes de reprogramar
--- Función para que administradores listenn tareas suspendidas
-CREATE OR REPLACE FUNCTION public.admin_get_suspended_tasks()
+-- Función para que administradores listen tareas suspendidas
+
+-- Eliminar ambas firmas para asegurar la idempotencia
+DROP FUNCTION IF EXISTS public.admin_get_suspended_tasks();
+DROP FUNCTION IF EXISTS public.admin_get_suspended_tasks(text, int, int);
+
+-- Crear la nueva función con paginación y búsqueda
+CREATE OR REPLACE FUNCTION public.admin_get_suspended_tasks(p_search_term text default '', p_page_num int default 1, p_page_size int default 10)
 RETURNS TABLE (
   id uuid,
   title text,
@@ -203,40 +217,61 @@ RETURNS TABLE (
   suspended_at timestamptz,
   scope jsonb,
   created_at timestamptz,
-  updated_at timestamptz
-) LANGUAGE plpgsql SECURITY DEFINER AS $$
+  updated_at timestamptz,
+  total_count bigint
+) LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   -- Solo administradores pueden usar esta RPC
   IF NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'permission denied: admin only';
   END IF;
-
+  
   RETURN QUERY
-  SELECT t.id, t.title, t.owner_id, (SELECT full_name FROM public.profiles WHERE id = t.owner_id),
-         t.responsible_person_id, (SELECT full_name FROM public.profiles WHERE id = t.responsible_person_id),
-         t.suspended_by, (SELECT full_name FROM public.profiles WHERE id = t.suspended_by),
-         t.suspension_reason, t.suspended_at, t.scope, t.created_at, t.updated_at
-  FROM public.tasks t
-  WHERE t.suspended = true
-    AND (t.scope IS NULL OR (t.scope->>'due_date') IS NULL);
+  with suspended_tasks as (
+    select
+      t.id, t.title, t.owner_id, o.full_name as owner_name,
+      t.responsible_person_id, r.full_name as responsible_name,
+      t.suspended_by, s.full_name as suspended_by_name,
+      t.suspension_reason, t.suspended_at, t.scope, t.created_at, t.updated_at,
+      count(*) over() as total_count
+    from tasks t
+    left join profiles o on t.owner_id = o.id
+    left join profiles r on t.responsible_person_id = r.id
+    left join profiles s on t.suspended_by = s.id
+    where t.suspended = true
+      and (p_search_term = '' or t.title ilike '%' || p_search_term || '%' or o.full_name ilike '%' || p_search_term || '%' or r.full_name ilike '%' || p_search_term || '%')
+  )
+  select * from suspended_tasks
+  order by suspended_tasks.suspended_at desc
+  limit p_page_size
+  offset (p_page_num - 1) * p_page_size;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.admin_get_suspended_tasks() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.admin_get_suspended_tasks() TO service_role;
+GRANT EXECUTE ON FUNCTION public.admin_get_suspended_tasks(text, int, int) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_get_suspended_tasks(text, int, int) TO service_role;
 
 -- RPC para reprogramar una tarea: actualiza due_date dentro de scope, reanuda y registra la actividad
-DROP FUNCTION IF EXISTS public.reprogram_task(uuid,timestamptz);
-CREATE OR REPLACE FUNCTION public.reprogram_task(p_task_id uuid, p_new_due_date timestamptz)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+-- Se define con `text` para `p_new_due_date` para coincidir con la llamada del cliente (ISO string) y evitar ambigüedad.
+DROP FUNCTION IF EXISTS public.reprogram_task(uuid, timestamptz);
+DROP FUNCTION IF EXISTS public.reprogram_task(uuid, text);
+
+CREATE OR REPLACE FUNCTION public.reprogram_task(p_task_id uuid, p_new_due_date text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  current_user_id uuid := auth.uid();
+  current_user_name text;
 BEGIN
-  -- Solo administradores pueden reprogramar desde esta RPC
-  IF NOT public.is_admin(auth.uid()) THEN
+  -- Solo administradores pueden reprogramar
+  IF NOT public.is_admin(current_user_id) THEN
     RAISE EXCEPTION 'permission denied: admin only';
   END IF;
 
+  -- Obtener nombre del actor para el log
+  SELECT full_name INTO current_user_name FROM public.profiles WHERE id = current_user_id;
+
   -- Actualizar due_date en el JSON scope y reanudar la tarea
   UPDATE public.tasks
-  SET scope = jsonb_set(coalesce(scope, '{}'::jsonb), '{due_date}', to_jsonb(p_new_due_date::text), true),
+  SET scope = jsonb_set(coalesce(scope, '{}'::jsonb), '{due_date}', to_jsonb(p_new_due_date), true),
       suspended = false,
       suspension_reason = NULL,
       suspended_by = NULL,
@@ -246,11 +281,11 @@ BEGIN
 
   -- Registrar actividad
   INSERT INTO public.task_activity_log(task_id, event_type, detail, actor_id, actor_name)
-  VALUES (p_task_id, 'task_reprogrammed', concat('Reprogramada a ', p_new_due_date::text), auth.uid(), (SELECT full_name FROM public.profiles WHERE id = auth.uid()));
+  VALUES (p_task_id, 'task_reprogrammed', 'Tarea reprogramada. Nueva fecha: ' || to_char(p_new_due_date::timestamptz, 'DD/MM/YYYY HH24:MI'), current_user_id, current_user_name);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.reprogram_task(uuid,timestamptz) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.reprogram_task(uuid,timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION public.reprogram_task(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.reprogram_task(uuid, text) TO service_role;
 
 
 -- 7) RLS: enable and policies

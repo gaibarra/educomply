@@ -18,11 +18,12 @@ export function buildCorsHeaders(extra: Partial<Record<string,string>> = {}) {
     allowOrigin = parts.length <= 1 ? (parts[0] || '*') : parts[0]; // never output comma-separated values
   }
   return {
-    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Origin': allowOrigin || '*',
     'Vary': 'Origin',
     // Include both lowercase & capitalized Authorization to avoid strict checks in some gateways
     'Access-Control-Allow-Headers': 'authorization, Authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST,GET,OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Max-Age': '86400',
     ...extra
   };
@@ -36,13 +37,8 @@ export function buildCorsHeadersForRequest(req: Request, extra: Partial<Record<s
   const denoEnv: any = (typeof Deno !== 'undefined' && (Deno as any).env?.get) ? (Deno as any).env : null;
   const allowedRaw = (denoEnv?.get('ALLOWED_ORIGIN') || (globalThis as any)?.process?.env?.ALLOWED_ORIGIN || '*').toString();
   const requestOrigin = req.headers.get('origin') || '';
-  let allowOrigin = '*';
-  if (allowedRaw === '*') {
-    allowOrigin = requestOrigin || '*';
-  } else {
-    const allowedList = allowedRaw.split(',').map(s => s.trim()).filter(Boolean);
-    allowOrigin = allowedList.includes(requestOrigin) ? requestOrigin : allowedList[0] || '*';
-  }
+  // Prefer echoing the request Origin if present. Fallback to allowedRaw or '*'.
+  let allowOrigin = requestOrigin || (allowedRaw === '*' ? '*' : (allowedRaw.split(',').map(s => s.trim()).filter(Boolean)[0] || '*'));
   // Reflect requested headers/method for strict gateways
   const requestedHeaders = req.headers.get('access-control-request-headers');
   const requestedMethod = req.headers.get('access-control-request-method');
@@ -50,7 +46,6 @@ export function buildCorsHeadersForRequest(req: Request, extra: Partial<Record<s
     'Access-Control-Allow-Origin': allowOrigin,
     ...(requestedHeaders ? { 'Access-Control-Allow-Headers': requestedHeaders } : {}),
     ...(requestedMethod ? { 'Access-Control-Allow-Methods': requestedMethod + ',OPTIONS' } : {}),
-    'Access-Control-Allow-Credentials': 'true',
   });
   return { ...base, ...extra };
 }

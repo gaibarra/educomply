@@ -135,11 +135,21 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
     
     const [previewDoc, setPreviewDoc] = useState<any | null>(null);
     const [previewOpen, setPreviewOpen] = useState(false);
+    const [generatedDocs, setGeneratedDocs] = useState<Record<string,{url?:string; json?:any}>>({});
 
     const handleDownloadDocument = async (docName: string) => {
-        const buildAndOpenPreview = (json: any) => {
+    const buildAndOpenPreview = (json: any, keyName?: string) => {
             setPreviewDoc({ ...json });
             setPreviewOpen(true);
+            try {
+                const md = `# ${json.title}\n\n${json.summary}\n\n${json.body_markdown}\n\n---\nSources:\n${(json.sources||[]).map((s:any)=>`- ${s.citation}${s.url?` (${s.url})`:''}`).join('\n')}\n\n> ${json.disclaimer}`;
+                const blob = new Blob([md], { type: 'text/markdown' });
+                const urlObj = URL.createObjectURL(blob);
+                const key = keyName || json.filename || payload.docName;
+                setGeneratedDocs(prev => ({ ...prev, [key]: { url: urlObj, json } }));
+            } catch (e) {
+                console.warn('No se pudo crear URL del documento generado', e);
+            }
         };
         const payload = {
             docName,
@@ -180,7 +190,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                 text = await res.text();
                 if (!res.ok) throw new Error(`HTTP ${res.status} ${text.slice(0,120)}`);
                 const json = JSON.parse(text);
-                buildAndOpenPreview(json);
+                buildAndOpenPreview(json, payload.docName);
                 // remove processing toast on success after brief delay for smoothness
                 if (processingToastId) setTimeout(() => toast.removeToast(processingToastId!), 800);
                 return;
@@ -195,7 +205,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
             });
             const { data, error } = await Promise.race([invokePromise, abortPromise]) as any;
             if (error) throw error;
-            buildAndOpenPreview(data);
+            buildAndOpenPreview(data, payload.docName);
             // remove processing toast on success after brief delay for smoothness
             if (processingToastId) setTimeout(() => toast.removeToast(processingToastId!), 800);
         } catch (e:any) {
@@ -244,7 +254,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
 
     return (
         <>
-        <div className="glass rounded-xl shadow-xl transition-all duration-300 hover-3d font-sans">
+    <div className="glass rounded-xl shadow-xl transition-all duration-300 hover-3d font-sans bg-gradient-to-br from-blue-800 to-blue-700 border border-blue-900/40 ring-1 ring-blue-900/10">
             <div className="p-5 border-b border-white/10 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
                 <div className="flex justify-between items-start gap-4">
                     <div className="flex-1">
@@ -254,7 +264,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                                 {status}
                             </span>
                         </div>
-                        <h3 className="text-lg font-bold text-slate-100 mt-2">{task.description}</h3>
+                        <h3 className="text-base font-medium text-slate-100 mt-2">{task.description}</h3>
                          <div className="flex items-center gap-4 flex-wrap text-sm text-slate-300 mt-1">
                             <span>Fuente: {task.scope?.source ?? 'No especificada'}</span>
                             {task.scope && task.scope.level !== 'Institución' && (
@@ -377,21 +387,30 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                                 Documentos Sugeridos
                             </h4>
                             <ul className="space-y-2 pl-2">
-                                {task.documents.map(doc => (
+                                {task.documents.map(doc => {
+                                    const gen = generatedDocs[doc];
+                                    return (
                                     <li key={doc} className="flex items-center justify-between gap-3 p-2 bg-white/5 rounded-md border border-white/10">
                                         <div className="flex items-center gap-3">
                                             <DocumentTextIcon className="w-5 h-5 text-slate-300 shrink-0"/>
                                             <span className="text-sm text-slate-100">{doc}</span>
                                         </div>
-                                        <button
-                                            onClick={() => handleDownloadDocument(doc)}
-                                            className="p-1.5 rounded-full text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-                                            aria-label={`Descargar ${doc}`}
-                                        >
-                                            <DownloadIcon className="w-4 h-4" />
-                                        </button>
+                                        {gen && gen.url ? (
+                                            <a href={gen.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-full text-slate-300 hover:bg-white/10 hover:text-white transition-colors" aria-label={`Abrir ${doc}`}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 21H3V3"/></svg>
+                                            </a>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleDownloadDocument(doc)}
+                                                className="p-1.5 rounded-full text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                                                aria-label={`Descargar ${doc}`}
+                                            >
+                                                <DownloadIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </li>
-                                ))}
+                                    );
+                                })}
                             </ul>
                         </div>
                     )}
@@ -421,7 +440,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
         {isSuspendModalOpen && (
             <SuspendTaskModal isOpen={isSuspendModalOpen} onClose={() => setIsSuspendModalOpen(false)} task={task} onSuspend={(updated) => { onUpdateTask(updated); setIsSuspendModalOpen(false); }} />
         )}
-        <DocumentPreviewModal open={previewOpen} onClose={() => { setPreviewOpen(false); setPreviewDoc(null); }} doc={previewDoc} onDownload={doDownloadFromPreview} />
+    <DocumentPreviewModal open={previewOpen} onClose={() => { setPreviewOpen(false); setPreviewDoc(null); }} doc={previewDoc} onDownload={doDownloadFromPreview} relatedTaskId={task.id} />
         </>
     );
 };

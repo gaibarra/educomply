@@ -160,7 +160,7 @@ const SubTaskItem: React.FC<SubTaskItemProps> = ({ subTask, onUpdate, onDelete, 
             <div className="relative flex items-start gap-x-4 py-2">
                 <StatusIcon status={subTask.status} onClick={handleStatusChange} />
 
-                <div className="flex-1 pt-0.5 min-w-0 bg-white/[0.04] border border-white/10 rounded-md px-3 py-2 hover:bg-white/[0.07] transition-colors">
+                <div className="flex-1 pt-0.5 min-w-0 bg-sky-600/20 border border-sky-600/40 rounded-md px-3 py-2 hover:bg-sky-600/25 transition-colors shadow-sm">
                     <div className="flex justify-between items-center gap-2">
                         {isEditing ? (
                              <input
@@ -174,7 +174,7 @@ const SubTaskItem: React.FC<SubTaskItemProps> = ({ subTask, onUpdate, onDelete, 
                                 autoFocus
                             />
                         ) : (
-                            <p onClick={() => setIsEditing(true)} className={`flex-grow font-medium cursor-text transition-colors ${isCompleted ? 'line-through text-slate-400' : 'text-slate-100 hover:text-white'}`}>
+                            <p onClick={() => setIsEditing(true)} className={`flex-grow text-sm font-normal cursor-text transition-colors ${isCompleted ? 'line-through text-slate-400' : 'text-slate-100 hover:text-white'}`}>
                                 {subTask.description || "Sin descripción"}
                             </p>
                         )}

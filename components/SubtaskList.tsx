@@ -18,7 +18,7 @@ const SubtaskList: React.FC<{
         <div>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                    <h4 className="text-lg font-semibold text-slate-100">Plan de Acción y Sub-tareas</h4>
+                    <h4 className="text-base font-medium text-slate-100">Plan de Acción y Sub-tareas</h4>
                     <span className="text-sm text-slate-300">{subtasks.length} subtarea{subtasks.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="text-sm text-slate-300">Progreso: <span className="font-semibold text-slate-100">{Math.round(subtasks.length ? (completed / subtasks.length) * 100 : 0)}%</span></div>

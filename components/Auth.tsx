@@ -19,10 +19,10 @@ const Auth: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-app-gradient">
-            <div className="w-full max-w-md p-8 space-y-8 glass shadow-2xl rounded-xl border border-white/10 animate-fade-in">
+        <div className="min-h-screen flex items-center justify-center bg-gray-950">
+            <div className="w-full max-w-md p-8 space-y-8 bg-gray-900 shadow-2xl rounded-xl border border-gray-700 animate-fade-in">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-center text-gradient">
+                    <h2 className="text-3xl font-extrabold text-center text-white">
                         Bienvenido a EduComply
                     </h2>
                     <p className="mt-2 text-sm text-center text-slate-200/80">
@@ -31,7 +31,7 @@ const Auth: React.FC = () => {
                 </div>
                 <form className="space-y-6" onSubmit={handleLogin}>
                     <div className="flex flex-col gap-2">
-                        <label htmlFor="email" className="text-sm font-medium text-slate-200">
+                        <label htmlFor="email" className="text-sm font-medium text-gray-300">
                             Correo Electrónico
                         </label>
                         <input
@@ -40,13 +40,13 @@ const Auth: React.FC = () => {
                             type="email"
                             autoComplete="email"
                             required
-                            className="w-full px-3 py-2 border border-white/20 bg-white/10 text-slate-100 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-600 bg-gray-800 text-gray-200 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                         />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label htmlFor="password" className="text-sm font-medium text-slate-200">
+                        <label htmlFor="password" className="text-sm font-medium text-gray-300">
                             Contraseña
                         </label>
                         <input
@@ -55,13 +55,13 @@ const Auth: React.FC = () => {
                             type="password"
                             autoComplete="current-password"
                             required
-                            className="w-full px-3 py-2 border border-white/20 bg-white/10 text-slate-100 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-600 bg-gray-800 text-gray-200 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                         />
                     </div>
                     {error && (
-                         <div className="p-3 text-sm text-center text-white rounded-md state-gradient-error">
+                         <div className="p-3 text-sm text-center text-red-200 bg-red-500/20 rounded-md border border-red-500/30">
                             {error}
                         </div>
                     )}
@@ -69,8 +69,7 @@ const Auth: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-blue-400/30 disabled:bg-slate-500/50"
-                            style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)'}}
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-600 transition-colors"
                         >
                             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
                         </button>

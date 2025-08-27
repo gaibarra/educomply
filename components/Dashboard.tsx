@@ -216,7 +216,7 @@ const Dashboard: React.FC<{ profile: Profile; setActiveView: (view: View) => voi
         <div className="p-4 md:p-8">
             <div className="mb-6 flex items-start justify-between">
                 <div>
-                    <h2 className="text-2xl md:text-3xl font-extrabold text-gradient mb-1">Dashboard de Cumplimiento</h2>
+                    <h2 className="text-2xl font-medium text-gradient mb-1">Dashboard de Cumplimiento</h2>
                     <p className="text-slate-300 text-sm">Resumen del estado de cumplimiento de la institución.</p>
                 </div>
                 <div className="hidden md:flex gap-2">
@@ -256,7 +256,7 @@ const Dashboard: React.FC<{ profile: Profile; setActiveView: (view: View) => voi
                     <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-rose-400/20">
                         <ExclamationTriangleIcon className="h-6 w-6 text-rose-300" />
                     </div>
-                    <h3 className="mt-4 text-lg font-semibold text-rose-200">Error al Cargar Datos</h3>
+                    <h3 className="mt-4 text-base font-medium text-rose-200">Error al Cargar Datos</h3>
                     <p className="mt-2 text-sm text-rose-200/80 whitespace-pre-wrap">{fetchError}</p>
                 </div>
             ) : (
@@ -268,7 +268,7 @@ const Dashboard: React.FC<{ profile: Profile; setActiveView: (view: View) => voi
                                                 </div>
                                                 <div className="glass p-6 rounded-xl shadow-md border border-white/12 bg-gradient-to-b from-black/30 to-transparent">
                                                     <div className="flex items-center justify-between gap-4 mb-4">
-                                                        <h3 className="text-lg font-bold text-slate-100">Obligaciones Críticas Próximas</h3>
+                                                        <h3 className="text-base font-medium text-slate-100">Obligaciones Críticas Próximas</h3>
                                                     </div>
                                                     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                                                         {pageItems.length > 0 ? (

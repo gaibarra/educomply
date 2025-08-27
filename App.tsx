@@ -249,11 +249,11 @@ const App: React.FC = () => {
 
   return (
     <ToastProvider>
-      <div className="flex h-screen bg-transparent font-sans">
+      <div className="flex h-screen font-sans">
         <Sidebar activeView={activeView} setActiveView={setActiveView} profile={profile} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header session={session} profile={profile} institutionProfile={institutionProfile} />
-          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent">
+          <main className="flex-1 overflow-x-hidden overflow-y-auto">
             {renderContent()}
           </main>
         </div>

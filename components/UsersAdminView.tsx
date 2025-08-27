@@ -52,31 +52,18 @@ const UsersAdminView: React.FC<{ profile: Profile }>= ({ profile }) => {
       try {
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
-        let q: any = supabase
-          .from('profiles' as any)
+        let query = supabase
+          .from('profiles')
           .select('id, full_name, role, scope_entity, mobile, position, campus, area, email', { count: 'exact' });
-        if (roleFilter !== 'Todos') q = q.eq('role', roleFilter);
-        if (search) q = q.ilike('full_name', `%${search}%`);
-        q = q.order(sortBy === 'email' ? 'email' : sortBy, { ascending: sortDir === 'asc' });
-        q = q.range(from, to);
-  const { data, error, count } = await q;
-        if (error) {
-          // Fallback sin email
-          let q2: any = supabase
-            .from('profiles' as any)
-            .select('id, full_name, role, scope_entity, mobile, position, campus, area', { count: 'exact' });
-          if (roleFilter !== 'Todos') q2 = q2.eq('role', roleFilter);
-          if (search) q2 = q2.ilike('full_name', `%${search}%`);
-          q2 = q2.order(sortBy === 'email' ? 'full_name' : sortBy, { ascending: sortDir === 'asc' });
-          q2 = q2.range(from, to);
-          const { data: d2, error: e2, count: c2 } = await q2;
-          if (e2) throw e2;
-          setUsers((d2 || []) as any);
-          setTotal(c2 || (d2 || []).length);
-        } else {
-          setUsers((data || []) as any);
-          setTotal(count || (data || []).length);
-        }
+        if (roleFilter !== 'Todos') query = query.eq('role', roleFilter);
+        if (search) query = query.ilike('full_name', `%${search}%`);
+        query = query.order(sortBy, { ascending: sortDir === 'asc' });
+        query = query.range(from, to);
+  const { data, error, count } = await query;
+  if (error) throw error;
+  // data may omit some DB columns depending on the select projection; cast via unknown to Profile[] to satisfy TS
+  setUsers(((data || []) as unknown) as Profile[]);
+        setTotal(count || 0);
       } catch (e: any) {
         setError(e?.message || 'No se pudieron cargar los usuarios');
       } finally { setLoading(false); }

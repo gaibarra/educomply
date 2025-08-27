@@ -106,20 +106,20 @@ const ComplianceItemCard: React.FC<{ item: ComplianceObligation; onCompleted?: (
   return (
     <div className={`glass p-4 rounded-lg shadow-sm border-l-4 border-brand-secondary flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 border border-white/10 relative transition z-10 ${open ? 'overflow-visible' : ''} ${anim==='pulse'?'animate-pulse':''} ${anim==='done'?'ring-2 ring-emerald-400/60':''} font-sans`}>
       <div className="flex-1">
-        <h3 className="font-bold text-slate-100 text-lg">{item.name}</h3>
-        <div className="flex items-center space-x-4 mt-2 text-sm text-slate-300">
+        <h3 className="text-sm font-normal text-slate-100">{item.name}</h3>
+        <div className="flex items-center space-x-4 mt-2 text-xs text-slate-300">
           <span>
-            <strong>Categoría:</strong> {item.category}
+            <span className="font-medium text-xs">Categoría:</span> {item.category}
           </span>
           <span>
-            <strong>Autoridad:</strong> {item.authority}
+            <span className="font-medium text-xs">Autoridad:</span> {item.authority}
           </span>
         </div>
       </div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center sm:space-x-6 w-full sm:w-auto">
         <div className="text-sm">
-          <p className="font-semibold text-slate-300">Vencimiento</p>
-          <p className="text-slate-400">{item.dueDate}</p>
+          <p className="text-xs font-medium text-slate-300">Vencimiento</p>
+          <p className="text-slate-400 text-xs">{item.dueDate}</p>
         </div>
         <div className="flex items-center space-x-2 mt-2 sm:mt-0">
           <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusClasses(localStatus)}`}>
