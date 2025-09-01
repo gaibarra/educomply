@@ -1,13 +1,4 @@
-
-
-
-
-
-
-
-
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Task, SubTask, TaskOverallStatus, Profile, Database, TaskScope } from '../types';
 import SubtaskList from './SubtaskList';
@@ -64,6 +55,29 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
     const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
     const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
     const toast = useToast();
+
+    const [existingDocuments, setExistingDocuments] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchExistingDocuments = async () => {
+            if (!task.id) return;
+
+            const { data, error } = await supabase
+                .from('documents')
+                .select('*')
+                .eq('task_id', task.id)
+                .eq('is_active', true);
+
+            if (error) {
+                console.error('Error fetching existing documents:', error);
+            } else {
+                setExistingDocuments(data || []);
+            }
+        };
+
+        fetchExistingDocuments();
+    }, [task.id]);
+    
 
     const handleAddSubTask = () => {
         if (task.subTasks.length === 0) {
@@ -135,22 +149,28 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
     
     const [previewDoc, setPreviewDoc] = useState<any | null>(null);
     const [previewOpen, setPreviewOpen] = useState(false);
-    const [generatedDocs, setGeneratedDocs] = useState<Record<string,{url?:string; json?:any}>>({});
+    
+
+    // Normalize document keys (remove accents, collapse whitespace, lowercase)
+    const normalizeKey = (s?: string) => {
+        if (!s) return '';
+        return s
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
+    // New function to handle document saved event from DocumentPreviewModal
+    const handleDocumentSaved = (savedDoc: any) => {
+        setExistingDocuments(prev => [...prev, savedDoc]);
+        toast.addToast('success', 'Documento guardado exitosamente!', 3000);
+    };
+
+    
 
     const handleDownloadDocument = async (docName: string) => {
-    const buildAndOpenPreview = (json: any, keyName?: string) => {
-            setPreviewDoc({ ...json });
-            setPreviewOpen(true);
-            try {
-                const md = `# ${json.title}\n\n${json.summary}\n\n${json.body_markdown}\n\n---\nSources:\n${(json.sources||[]).map((s:any)=>`- ${s.citation}${s.url?` (${s.url})`:''}`).join('\n')}\n\n> ${json.disclaimer}`;
-                const blob = new Blob([md], { type: 'text/markdown' });
-                const urlObj = URL.createObjectURL(blob);
-                const key = keyName || json.filename || payload.docName;
-                setGeneratedDocs(prev => ({ ...prev, [key]: { url: urlObj, json } }));
-            } catch (e) {
-                console.warn('No se pudo crear URL del documento generado', e);
-            }
-        };
         const payload = {
             docName,
             taskDescription: task.description,
@@ -173,7 +193,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
             const token = session.data.session?.access_token;
             const anonKey = (supabase as any).anonKey || import.meta.env.VITE_SUPABASE_ANON_KEY;
             const supaUrl = (supabase as any).supabaseUrl || '';
-            const url = `${supaUrl.replace(/\/$/,'')}/functions/v1/generate-document`;
+             const url = `${supaUrl.replace(/\/$/, '')}/functions/v1/generate-document`;
             let res: Response | null = null;
             let text = '';
             try {
@@ -189,11 +209,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                 });
                 text = await res.text();
                 if (!res.ok) throw new Error(`HTTP ${res.status} ${text.slice(0,120)}`);
-                const json = JSON.parse(text);
-                buildAndOpenPreview(json, payload.docName);
+                                let raw = text.trim();
+                                if (raw.startsWith('```json')) {
+                                    raw = raw.replace(/^```json/, '').replace(/```$/, '').trim();
+                                }
+                                const json = JSON.parse(raw);
+                setPreviewDoc(json); // Directly set previewDoc with the generated JSON
+                setPreviewOpen(true); // Open the modal
                 // remove processing toast on success after brief delay for smoothness
                 if (processingToastId) setTimeout(() => toast.removeToast(processingToastId!), 800);
-                return;
+                return; 
             } catch (primaryErr) {
                 console.warn('[generate-document] fetch directo falló, intento invoke()', primaryErr);
             }
@@ -205,7 +230,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
             });
             const { data, error } = await Promise.race([invokePromise, abortPromise]) as any;
             if (error) throw error;
-            buildAndOpenPreview(data, payload.docName);
+            setPreviewDoc(data); // Directly set previewDoc with the generated data
+            setPreviewOpen(true); // Open the modal
             // remove processing toast on success after brief delay for smoothness
             if (processingToastId) setTimeout(() => toast.removeToast(processingToastId!), 800);
         } catch (e:any) {
@@ -359,7 +385,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                                         }}
                                         className="px-4 py-2 rounded-md text-sm font-semibold text-white shadow-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-90 transition"
                                     >Marcar tarea como cumplida</button>
-                                )}
+                                )
+                                }
                                 {status === 'Completada' && (
                                     <button
                                         onClick={async ()=> {
@@ -372,7 +399,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                                         }}
                                         className="px-4 py-2 rounded-md text-sm font-semibold text-slate-900 bg-amber-300 hover:bg-amber-400 transition"
                                     >Reabrir tarea</button>
-                                )}
+                                )
+                                }
                                 <button
                                     onClick={handleAddSubTask}
                                     className="px-4 py-2 rounded-md text-sm font-semibold text-slate-100 bg-white/10 border border-white/20 hover:bg-white/20 transition"
@@ -388,22 +416,36 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
                             </h4>
                             <ul className="space-y-2 pl-2">
                                 {task.documents.map(doc => {
-                                    const gen = generatedDocs[doc];
+                                    const normalizedDocName = normalizeKey(doc);
+                                    const foundDoc = normalizedDocName
+                                        ? existingDocuments.find(d =>
+                                            normalizeKey(d.title).includes(normalizedDocName) ||
+                                            normalizeKey(d.filename).includes(normalizedDocName)
+                                        )
+                                        : undefined;
+
                                     return (
                                     <li key={doc} className="flex items-center justify-between gap-3 p-2 bg-white/5 rounded-md border border-white/10">
                                         <div className="flex items-center gap-3">
                                             <DocumentTextIcon className="w-5 h-5 text-slate-300 shrink-0"/>
                                             <span className="text-sm text-slate-100">{doc}</span>
                                         </div>
-                                        {gen && gen.url ? (
-                                            <a href={gen.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-full text-slate-300 hover:bg-white/10 hover:text-white transition-colors" aria-label={`Abrir ${doc}`}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 21H3V3"/></svg>
-                                            </a>
+                                        {foundDoc ? (
+                                            <button
+                                                onClick={() => {
+                                                    setPreviewDoc(foundDoc);
+                                                    setPreviewOpen(true);
+                                                }}
+                                                className="p-1.5 rounded-md text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                                                aria-label={`Ver ${doc}`}
+                                            >
+                                                <DocumentTextIcon className="w-4 h-4" />
+                                            </button>
                                         ) : (
                                             <button
                                                 onClick={() => handleDownloadDocument(doc)}
-                                                className="p-1.5 rounded-full text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-                                                aria-label={`Descargar ${doc}`}
+                                                className="p-1.5 rounded-md text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                                                aria-label={`Generar y Descargar ${doc}`}
                                             >
                                                 <DownloadIcon className="w-4 h-4" />
                                             </button>
@@ -440,7 +482,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateTask, availableTeamMe
         {isSuspendModalOpen && (
             <SuspendTaskModal isOpen={isSuspendModalOpen} onClose={() => setIsSuspendModalOpen(false)} task={task} onSuspend={(updated) => { onUpdateTask(updated); setIsSuspendModalOpen(false); }} />
         )}
-    <DocumentPreviewModal open={previewOpen} onClose={() => { setPreviewOpen(false); setPreviewDoc(null); }} doc={previewDoc} onDownload={doDownloadFromPreview} relatedTaskId={task.id} />
+    <DocumentPreviewModal open={previewOpen} onClose={() => { setPreviewOpen(false); setPreviewDoc(null); }} doc={previewDoc} onDownload={doDownloadFromPreview} relatedTaskId={task.id} onSave={handleDocumentSaved} />
         </>
     );
 };

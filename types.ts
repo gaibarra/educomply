@@ -1,5 +1,3 @@
-
-
 import type { Session as SupabaseSession } from '@supabase/supabase-js';
 
 export type View = 'dashboard' | 'normativas' | 'tareas' | 'auditorias' | 'reportes' | 'institucion' | 'proyectos' | 'usuarios' | 'gantt' | 'reprogramar';
@@ -79,49 +77,73 @@ export interface TaskRow {
 // --- Tipos para el Módulo de Auditorías ---
 export type AuditStatus = 'Planificada' | 'En Progreso' | 'Completada' | 'Cancelada';
 export type AuditPhaseKey = 'planificacion' | 'ejecucion' | 'evaluacion' | 'seguimiento';
-export interface AuditPhaseActivity { key: string; title: string; completed: boolean; notes?: string | null; }
-export interface AuditPhasesState {
-  planificacion?: { activities: AuditPhaseActivity[] };
-  ejecucion?: { activities: AuditPhaseActivity[] };
-  evaluacion?: { activities: AuditPhaseActivity[] };
-  seguimiento?: { activities: AuditPhaseActivity[] };
-}
 export type FindingSeverity = 'Crítico' | 'Mayor' | 'Menor' | 'Observación';
 export type FindingStatus = 'Abierto' | 'Cerrado';
 
 export interface AuditFindingRow {
   id: number;
   created_at: string;
-  audit_id: number;
+  audit_id: string;
   description: string;
   severity: FindingSeverity;
   status: FindingStatus;
   recommendation: string;
-  related_task_id: string | null; // Changed from number to string for UUID
+  related_task_id: string | null;
 }
 
 export interface AuditRow {
-  id: number;
+  id: string;
   created_at: string;
+  updated_at: string;
   name: string;
   scope_level: ScopeLevel | 'General';
   scope_entity: string | null;
   status: AuditStatus;
   start_date: string;
   end_date: string;
-  auditor_id: string; // uuid from profiles
-  project_id?: string | null; // uuid
+  auditor_id: string;
+  project_id?: string | null;
   ai_description?: string | null;
   ai_raw_suggestion?: any | null;
   current_phase?: AuditPhaseKey | null;
-  phase_activities?: AuditPhasesState | null;
-  phase_log?: { ts: string; from: AuditPhaseKey | null; to: AuditPhaseKey | null; actor?: string | null }[] | null;
 }
 
 export interface AuditTaskLinkRow {
-    audit_id: number;
-    task_id: string; // Changed from number to string for UUID
+    audit_id: string;
+    task_id: string;
 }
+
+export interface AuditPhaseActivityRow {
+    id: number;
+    audit_id: string;
+    phase: AuditPhaseKey;
+    description: string;
+    completed: boolean;
+    notes: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface AuditHistoryLogRow {
+    id: number;
+    audit_id: string;
+    actor_id: string | null;
+    actor_name: string | null;
+    event_type: string;
+    detail: any | null;
+    created_at: string;
+}
+
+export interface AuditPhaseSubActivityRow {
+    id: string; // uuid
+    activity_id: number;
+    description: string;
+    start_date: string;
+    end_date: string;
+    completed: boolean;
+    created_at: string;
+}
+
 
 // --- Tipos para el Módulo de Institución ---
 export interface InstitutionLocation {
@@ -290,6 +312,7 @@ export type Database = {
       audits: {
         Row: AuditRow;
         Insert: {
+          id?: string;
           name: string;
           scope_level: ScopeLevel | 'General';
           scope_entity: string | null;
@@ -301,8 +324,6 @@ export type Database = {
           ai_description?: string | null;
           ai_raw_suggestion?: any | null;
           current_phase?: AuditPhaseKey | null;
-          phase_activities?: AuditPhasesState | null;
-          phase_log?: { ts: string; from: AuditPhaseKey | null; to: AuditPhaseKey | null; actor?: string | null }[] | null;
         };
         Update: {
           name?: string;
@@ -316,38 +337,83 @@ export type Database = {
           ai_description?: string | null;
           ai_raw_suggestion?: any | null;
           current_phase?: AuditPhaseKey | null;
-          phase_activities?: AuditPhasesState | null;
-          phase_log?: { ts: string; from: AuditPhaseKey | null; to: AuditPhaseKey | null; actor?: string | null }[] | null;
         };
         Relationships: [];
       };
       audit_findings: {
         Row: AuditFindingRow;
         Insert: {
-          audit_id: number;
+          audit_id: string;
           description: string;
           severity: FindingSeverity;
           status: FindingStatus;
           recommendation: string;
-          related_task_id: string | null; // Changed from number
+          related_task_id: string | null;
         };
         Update: {
           description?: string;
           severity?: FindingSeverity;
           status?: FindingStatus;
           recommendation?: string;
-          related_task_id?: string | null; // Changed from number
+          related_task_id?: string | null;
         };
         Relationships: [];
       };
       audit_tasks: {
           Row: AuditTaskLinkRow;
           Insert: {
-            audit_id: number;
-            task_id: string; // Changed from number
+            audit_id: string;
+            task_id: string;
           };
-          Update: Record<string, never>; // no editable fields currently
+          Update: Record<string, never>;
           Relationships: [];
+      };
+      audit_phase_activities: {
+        Row: AuditPhaseActivityRow;
+        Insert: {
+            audit_id: string;
+            phase: AuditPhaseKey;
+            description: string;
+            completed?: boolean;
+            notes?: string | null;
+        };
+        Update: {
+            phase?: AuditPhaseKey;
+            description?: string;
+            completed?: boolean;
+            notes?: string | null;
+        };
+        Relationships: [];
+      };
+      audit_phase_sub_activities: {
+        Row: AuditPhaseSubActivityRow;
+        Insert: {
+            id?: string;
+            activity_id: number;
+            description: string;
+            start_date: string;
+            end_date: string;
+            completed?: boolean;
+        };
+        Update: {
+            description?: string;
+            start_date?: string;
+            end_date?: string;
+            completed?: boolean;
+        };
+        Relationships: [];
+      };
+      audit_history_log: {
+        Row: AuditHistoryLogRow;
+        Insert: {
+            audit_id: string;
+            actor_id?: string | null;
+            actor_name?: string | null;
+            event_type: string;
+            detail?: any | null;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
       };
       institution_profile: {
           Row: InstitutionProfileRow;
@@ -496,6 +562,12 @@ export interface AiAuditPlanSuggestion {
   name: string;
   scope_level: ScopeLevel | 'General';
   scope_entity: string;
+  phase_activities?: {
+    planificacion?: { activities: { key: string; title: string; }[] };
+    ejecucion?: { activities: { key: string; title: string; }[] };
+    evaluacion?: { activities: { key: string; title: string; }[] };
+    seguimiento?: { activities: { key: string; title: string; }[] };
+  };
 }
 
 export type ResponsibleArea = ResponsibleAreaRow;
@@ -582,7 +654,7 @@ export interface TaskFilters {
 export type AuditFinding = AuditFindingRow;
 
 export interface Audit {
-    id: number;
+    id: string;
     created_at: string;
     name: string;
     scope_level: ScopeLevel | 'General';
@@ -590,12 +662,12 @@ export interface Audit {
     status: AuditStatus;
     start_date: string;
     end_date: string;
-    auditor_id: string; // uuid from profiles
+    auditor_id: string;
     auditor: SimpleProfile | null;
     findings: AuditFinding[];
-  current_phase?: AuditPhaseKey | null;
-  phase_activities?: AuditPhasesState | null;
-  phase_log?: { ts: string; from: AuditPhaseKey | null; to: AuditPhaseKey | null; actor?: string | null }[] | null;
+    current_phase?: AuditPhaseKey | null;
+    phase_activities: AuditPhaseActivityRow[];
+    phase_log: AuditHistoryLogRow[];
 }
 
 
@@ -606,4 +678,3 @@ export interface GeneratedReport {
     title: string;
     content: string; // Markdown content
 }
-

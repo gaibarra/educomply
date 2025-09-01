@@ -3,8 +3,11 @@ import { buildCorsHeaders, buildCorsHeadersForRequest } from '../supabase/functi
 
 describe('buildCorsHeaders', () => {
   it('returns wildcard by default', () => {
+    const original = process.env.ALLOWED_ORIGIN;
+    delete process.env.ALLOWED_ORIGIN;
     const h = buildCorsHeaders();
     expect(h['Access-Control-Allow-Origin']).toBe('*');
+    process.env.ALLOWED_ORIGIN = original;
   });
   it('respects ALLOWED_ORIGIN from process.env', () => {
     process.env.ALLOWED_ORIGIN = 'http://example.com';

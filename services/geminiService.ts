@@ -23,11 +23,13 @@ const invokeFunction = async (functionName: string, body: any) => {
         const session = await (supabase as any).auth?.getSession?.();
         accessToken = session?.data?.session?.access_token;
     } catch { /* ignore */ }
-            const isTestEnv = (
-                typeof process !== 'undefined' && (
-                    (process as any)?.env?.VITEST || (process as any)?.env?.NODE_ENV === 'test'
-                )
-            ) || !!(import.meta as any)?.vitest;
+
+    const isTestEnv = (
+        typeof process !== 'undefined' && (
+            (process as any)?.env?.VITEST || (process as any)?.env?.NODE_ENV === 'test'
+        )
+    ) || !!(import.meta as any)?.vitest;
+
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'apikey': anonKey,
@@ -38,7 +40,7 @@ const invokeFunction = async (functionName: string, body: any) => {
     if (!isTestEnv && functionName === 'analyze-compliance' && body?.query) {
     try {
             const supaUrl = (supabase as any).supabaseUrl || '';
-            const url = `${supaUrl.replace(/\/$/,'')}/functions/v1/${functionName}?query=${encodeURIComponent(body.query)}`;
+            const url = `${supaUrl.replace(/\/$/, '')}/functions/v1/${functionName}?query=${encodeURIComponent(body.query)}`;
         const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
             if (!res.ok) {
                 const txt = await res.text();
@@ -71,7 +73,7 @@ const invokeFunction = async (functionName: string, body: any) => {
     if (/non-2xx status code/i.test(error.message)) {
         try {
             const supaUrl = (supabase as any).supabaseUrl || '';
-            const url = `${supaUrl.replace(/\/$/,'')}/functions/v1/${functionName}`;
+            const url = `${supaUrl.replace(/\/$/, '')}/functions/v1/${functionName}`;
             const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
             const txt = await res.text();
             if (!res.ok) {
@@ -93,13 +95,13 @@ const invokeFunction = async (functionName: string, body: any) => {
         // Manual fetch fallback with body + query redundancy
         try {
             const supaUrl = (supabase as any).supabaseUrl || '';
-            const base = `${supaUrl.replace(/\/$/,'')}/functions/v1/${functionName}`;
+            const base = `${supaUrl.replace(/\/$/, '')}/functions/v1/${functionName}`;
             const qp = new URLSearchParams();
             if (body && typeof body === 'object') {
                 for (const [k,v] of Object.entries(body)) { if (v != null) qp.set(k, String(v)); }
             }
             const url = qp.toString() ? `${base}?${qp.toString()}` : base;
-            const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+            const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), mode: 'cors' });
             const txt = await res.text();
             if (!res.ok) throw new Error(`Status ${res.status} ${txt.slice(0,200)}`);
             return JSON.parse(txt);
@@ -190,8 +192,6 @@ export const getComplianceAnalysis = async (query: string, temperature: number =
     }
 };
 
-
-// Helper to deeply search for a key variant inside an object graph
 const deepFindKey = (obj: any, keys: string[]): any => {
     if (!obj || typeof obj !== 'object') return undefined;
     for (const k of Object.keys(obj)) {
@@ -214,7 +214,7 @@ const extractFieldFromRaw = (raw: string, fieldNames: string[]): string | undefi
     const text = raw.replace(/```[a-zA-Z]*|```/g,'');
         for (const name of fieldNames) {
             // Use explicit character classes instead of \s to satisfy stricter linters
-            const re = new RegExp(`"${name}"[ \t]*:[ \t]*"([^"\n]{3,240})"`, 'i');
+            const re = new RegExp(`"${name}"[	 ]*:[ 	]*"([^"]{3,240})"`, 'i');
         const m = text.match(re);
         if (m) return sanitizeBasic(m[1]);
     }
@@ -250,80 +250,115 @@ const coerceScopeLevel = (raw: string | undefined): string => {
     return 'General';
 };
 
-export const getAuditPlanSuggestion = async (description: string): Promise<AiAuditPlanSuggestion> => {
-    const rawResponse: any = await invokeFunction('suggest-audit-plan', { description });
+export const getAuditPlanSuggestion = async (description: string, name?: string): Promise<AiAuditPlanSuggestion> => {
+    const payload = { description, ...(name && { name }) };
+    const rawResponse: any = await invokeFunction('suggest-audit-plan', payload);
     let candidate: any = rawResponse?.plan || rawResponse?.data || rawResponse;
 
-    // If it's a string with JSON fenced, attempt to parse
-        if (typeof candidate === 'string') {
-            const original = candidate;
-            // Remove markdown fences and trim
-            candidate = candidate.replace(/```[a-zA-Z]*|```/g,'').trim();
-            // Strip leading labels like "json", "respuesta", etc. before first brace
-            const firstBrace = candidate.indexOf('{');
-            if (firstBrace > 0) {
-                const prefix = candidate.slice(0, firstBrace).toLowerCase();
-                if (/json|plan|respuesta|output|data|resultado/.test(prefix.replace(/[^a-z]/g,''))) {
-                    candidate = candidate.slice(firstBrace);
-                }
+    let parsedCandidate: any = null;
+    if (typeof candidate === 'string') {
+        try {
+            let jsonString = candidate.replace(/```[a-zA-Z]*|```/g, '').trim();
+            if (jsonString.startsWith('json')) {
+                jsonString = jsonString.slice(4).trim();
             }
-            // If still starts with identifier then brace (e.g., json { ), collapse
-            candidate = candidate.replace(/^(json|plan|respuesta|output|data|resultado)\s*(?=\{)/i,'');
-            // Attempt targeted field extraction BEFORE JSON parse
-            // Attempt to extract clean name directly
-            const extractedName = extractFieldFromRaw(candidate, ['titulo','title','name','nombre']);
-            const extractedLevel = extractFieldFromRaw(candidate, ['scope_level','nivel','scopeLevel']);
-            const extractedEntity = extractFieldFromRaw(candidate, ['scope_entity','entidad','scopeEntity','entity']);
+            parsedCandidate = JSON.parse(jsonString);
+        } catch (e) {
+            const extractedName = extractFieldFromRaw(candidate, ['name', 'title', 'titulo']);
             if (extractedName) {
-                return {
+                parsedCandidate = {
                     name: extractedName,
-                    scope_level: coerceScopeLevel(extractedLevel || 'General') as any,
-                    scope_entity: extractedEntity || ''
+                    scope_level: extractFieldFromRaw(candidate, ['scope_level', 'nivel']) || 'General',
+                    scope_entity: extractFieldFromRaw(candidate, ['scope_entity', 'entidad']) || '',
                 };
             }
-            // JSON parse fallback: take substring from first brace to last closing brace if mismatched
-            const fb = candidate.indexOf('{');
-            const lb = candidate.lastIndexOf('}');
-            if (fb !== -1 && lb !== -1 && lb > fb) {
-                const jsonSlice = candidate.slice(fb, lb+1);
-                try { candidate = JSON.parse(jsonSlice); } catch { candidate = original; }
-            }
         }
-
-    // If still not an object, wrap
-    if (!candidate || typeof candidate !== 'object') {
-        return {
-            name: sanitizeText(String(candidate || 'Auditoría de Cumplimiento').slice(0,120)) || 'Auditoría de Cumplimiento',
-            scope_level: 'General',
-            scope_entity: ''
-        };
     }
 
-    // Attempt to locate fields
-    const nameRaw = candidate.name || candidate.titulo || candidate.title || deepFindKey(candidate, ['name','titulo','title']);
-    const scopeLevelRaw = candidate.scope_level || candidate.scopeLevel || candidate.nivel || deepFindKey(candidate, ['scope_level','scopelevel','nivel']);
-    const scopeEntityRaw = candidate.scope_entity || candidate.scopeEntity || candidate.entidad || deepFindKey(candidate, ['scope_entity','scopeentity','entidad','entity']);
+    if (parsedCandidate) {
+        candidate = parsedCandidate;
+    }
 
-    const name = sanitizeText(nameRaw, 'Auditoría de Cumplimiento');
+    const nameRaw = candidate.name || candidate.titulo || candidate.title || candidate.titulo_auditoria || candidate.nombre_auditoria || candidate.plan_auditoria?.titulo || deepFindKey(candidate, ['name','titulo','title', 'titulo_auditoria', 'nombre_auditoria', 'audit_plan']);
+    const scopeLevelRaw = candidate.scope_level || candidate.scopeLevel || candidate.nivel || candidate.plan_auditoria?.alcance?.nivel || deepFindKey(candidate, ['scope_level','scopelevel','nivel']);
+    const scopeEntityRaw = candidate.scope_entity || candidate.scopeEntity || candidate.entidad || candidate.plan_auditoria?.alcance?.entidad || deepFindKey(candidate, ['scope_entity','scopeentity','entidad','entity']);
+
+    const finalName = sanitizeText(nameRaw, typeof candidate === 'string' ? candidate : 'Auditoría de Cumplimiento');
     const scope_level = coerceScopeLevel(sanitizeText(scopeLevelRaw));
     const scope_entity = sanitizeText(scopeEntityRaw);
 
-        return {
-            name: name || 'Auditoría de Cumplimiento',
-            scope_level: (scope_level as any) || 'General',
-            scope_entity,
-        } as AiAuditPlanSuggestion;
+    try {
+        let potentialJson = finalName;
+        if (typeof potentialJson === 'string' && potentialJson.trim().startsWith('json')) {
+            potentialJson = potentialJson.trim().slice(4).trim();
+        }
+        
+        let parsedJson;
+        if (typeof potentialJson === 'string' && potentialJson.trim().startsWith('{')) {
+            parsedJson = JSON.parse(potentialJson);
+        } else if (typeof potentialJson === 'object' && potentialJson !== null) {
+            parsedJson = potentialJson;
+        }
+
+        if (parsedJson) {
+            const nestedName = parsedJson.name || parsedJson.titulo || parsedJson.title || deepFindKey(parsedJson, ['name','titulo','title']);
+            const nestedScopeLevel = parsedJson.scope_level || parsedJson.nivel || deepFindKey(parsedJson, ['scope_level','nivel']);
+            const nestedScopeEntity = parsedJson.scope_entity || parsedJson.entidad || deepFindKey(parsedJson, ['scope_entity','entidad']);
+
+            return {
+                name: sanitizeText(nestedName, 'Auditoría de Cumplimiento'),
+                scope_level: coerceScopeLevel(sanitizeText(nestedScopeLevel, scope_level)) as any,
+                scope_entity: sanitizeText(nestedScopeEntity, scope_entity),
+            }
+        }
+    } catch (e) {
+        // Not a valid JSON, proceed with the original flat values.
+    }
+
+    return {
+        name: finalName || 'Auditoría de Cumplimiento',
+        scope_level: (scope_level as any) || 'General',
+        scope_entity,
+    } as AiAuditPlanSuggestion;
 };
 
 export const generateReport = async (
     request: { type: 'predefined'; reportType: PredefinedReportType } | { type: 'ai'; query: string }
 ): Promise<GeneratedReport> => {
     const body = request.type === 'predefined' 
-        ? { reportType: request.reportType }
+        ? { reportType: request.reportType } 
         : { query: request.query };
     const response = await invokeFunction('generate-report', body);
     if (!response || typeof response !== 'object' || (!('report' in response) && !('content' in response))) {
         throw new Error("Respuesta inválida de generate-report");
     }
     return response as GeneratedReport;
+};
+
+export const generateSubActivities = async (description: string): Promise<{ subActivities: { description: string; start_date: string; end_date: string; }[] }> => {
+    console.log('[generateSubActivities] Starting with description:', description);
+
+    try {
+        const response = await invokeFunction('generate-sub-activities', { description });
+        console.log('[generateSubActivities] Raw response:', response);
+
+        if (!response || typeof response !== 'object') {
+            throw new Error("Respuesta vacía o inválida de generate-sub-activities");
+        }
+
+        if (!('subActivities' in response)) {
+            throw new Error("Respuesta no contiene 'subActivities'");
+        }
+
+        if (!Array.isArray(response.subActivities)) {
+            throw new Error("'subActivities' no es un array");
+        }
+
+        console.log('[generateSubActivities] Success, returning:', response.subActivities.length, 'sub-activities');
+        return response as any;
+
+    } catch (error: any) {
+        console.error('[generateSubActivities] Error:', error);
+        throw new Error(`Error generando sub-actividades: ${error.message}`);
+    }
 };

@@ -5,14 +5,13 @@
 // deno-lint-ignore-file no-explicit-any
 import { GoogleGenerativeAI } from "npm:@google/generative-ai";
 // @ts-ignore: Deno global for edge runtime
+import { buildCorsHeadersForRequest } from "../_shared/cors.ts";
 declare const Deno: any;
 
 const LOG_LEVEL = (Deno.env.get('LOG_LEVEL') || 'info').toLowerCase();
 const levelOrder: Record<string, number> = { debug:10, info:20, warn:30, error:40, silent:100 };
 const currentLevel = levelOrder[LOG_LEVEL] ?? 20;
 const log = (lvl: keyof typeof levelOrder, ...a:any[]) => { if (currentLevel <= levelOrder[lvl]) console.log(`[${lvl.toUpperCase()}]`, ...a); };
-
-// No se usa el helper de CORS compartido para que la lógica sea más clara y autocontenida.
 
 interface GenDocRequest {
   docName: string;

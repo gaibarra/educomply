@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import EnhancedSelect from './EnhancedSelect';
 import { supabase } from '../services/supabaseClient';
-import type { Profile } from '../types';
+import type { Profile, InstitutionProfileRow, ResponsibleAreaRow } from '../types';
 
 type NewUser = {
   email: string;
@@ -25,7 +25,7 @@ const initialUser: NewUser = {
   area: ''
 };
 
-const UsersAdminView: React.FC<{ profile: Profile }>= ({ profile }) => {
+const UsersAdminView: React.FC<{ profile: Profile; institutionProfile: InstitutionProfileRow | null; }>= ({ profile, institutionProfile }) => {
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string|null>(null);
@@ -42,6 +42,15 @@ const UsersAdminView: React.FC<{ profile: Profile }>= ({ profile }) => {
   const [phoneCountry, setPhoneCountry] = useState<'MX'|'US'>('MX');
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [lastCreds, setLastCreds] = useState<{ email: string; password: string } | null>(null);
+  const [areas, setAreas] = useState<ResponsibleAreaRow[]>([]);
+  const [areasLoading, setAreasLoading] = useState(false);
+  const [areasError, setAreasError] = useState<string|null>(null);
+  const [showAreasPanel, setShowAreasPanel] = useState(false);
+  const [newAreaName, setNewAreaName] = useState('');
+  const [editingAreaId, setEditingAreaId] = useState<number|null>(null);
+  const [editingAreaName, setEditingAreaName] = useState('');
+  const [areaSaving, setAreaSaving] = useState(false);
+  const [areaOpError, setAreaOpError] = useState<string|null>(null);
 
   const isAdmin = useMemo(() => profile.role === 'admin', [profile.role]);
 
@@ -70,6 +79,22 @@ const UsersAdminView: React.FC<{ profile: Profile }>= ({ profile }) => {
     };
     if (isAdmin) load();
   }, [isAdmin, page, pageSize, sortBy, sortDir, search, roleFilter]);
+
+  // Cargar catálogo de áreas
+  useEffect(() => {
+    if (!isAdmin) return;
+    const fetchAreas = async () => {
+      setAreasLoading(true); setAreasError(null);
+      try {
+        const { data, error } = await supabase.from('responsible_areas').select('id,name').order('name');
+        if (error) throw error;
+        setAreas((data as any) || []);
+      } catch (e:any) {
+        setAreasError(e?.message || 'No se pudieron cargar las áreas');
+      } finally { setAreasLoading(false); }
+    };
+    fetchAreas();
+  }, [isAdmin]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -114,10 +139,17 @@ const UsersAdminView: React.FC<{ profile: Profile }>= ({ profile }) => {
     setLoading(true);
     try {
       // Call Edge Function (service role) to create auth user + profile
-  const { error } = await supabase.functions.invoke('admin-create-user', {
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: { email, password, full_name, role, mobile, position, campus, area }
       } as any);
-      if (error) throw new Error(error.message);
+      if (error) {
+        // Edge function non-2xx -> error.message is generic; try to extract detailed error from payload
+        const fnError = (data as any)?.error || (data as any)?.message;
+        throw new Error(fnError || error.message || 'Fallo desconocido (Edge Function)');
+      }
+      if ((data as any)?.error) {
+        throw new Error((data as any).error);
+      }
   setSuccess('Usuario creado correctamente.');
   setLastCreds({ email, password });
   setForm(initialUser);
@@ -236,11 +268,82 @@ const UsersAdminView: React.FC<{ profile: Profile }>= ({ profile }) => {
           </div>
           <div>
             <label className={labelCls}>Campus</label>
-            <input name="campus" value={form.campus} onChange={handleChange} className={inputCls} placeholder="Campus Norte" />
+            <EnhancedSelect
+              value={form.campus || ''}
+              onChange={(v)=> setForm(prev=>({ ...prev, campus: v || '' }))}
+              options={(institutionProfile?.locations || []).map(l=>({ value: l.name, label: l.name }))}
+              placeholder={(institutionProfile?.locations?.length || 0) > 0 ? 'Seleccionar campus' : 'Sin campus configurados'}
+              searchable
+              clearable
+            />
           </div>
           <div>
             <label className={labelCls}>Área</label>
-            <input name="area" value={form.area} onChange={handleChange} className={inputCls} placeholder="Laboratorios / Seguridad" />
+            <EnhancedSelect
+              value={form.area || ''}
+              onChange={(v)=> setForm(prev=>({ ...prev, area: v || '' }))}
+              options={areas.map(a=>({ value: a.name, label: a.name }))}
+              placeholder={areasLoading ? 'Cargando áreas...' : (areas.length? 'Seleccionar área':'Sin áreas configuradas')}
+              searchable
+              clearable
+            />
+            {areasError && <p className="text-xs text-rose-300 mt-1">{areasError}</p>}
+            <button type="button" onClick={()=> setShowAreasPanel(s=>!s)} className="mt-2 text-[11px] underline text-slate-300 hover:text-white">{showAreasPanel? 'Ocultar gestión de áreas':'Gestionar áreas'}</button>
+            {showAreasPanel && (
+              <div className="mt-3 p-3 rounded-md bg-white/5 border border-white/10 space-y-3">
+                <h4 className="text-xs font-semibold text-slate-200 tracking-wide">Catálogo de Áreas</h4>
+                <div className="flex gap-2 items-center">
+                  <input
+                    value={editingAreaId? editingAreaName : newAreaName}
+                    onChange={e=> editingAreaId? setEditingAreaName(e.target.value) : setNewAreaName(e.target.value)}
+                    placeholder={editingAreaId? 'Editar nombre de área' : 'Nombre de nueva área'}
+                    className="flex-1 px-2 py-1 rounded bg-white/10 border border-white/20 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-primary"/>
+                  {editingAreaId ? (
+                    <>
+                      <button disabled={areaSaving|| !editingAreaName.trim()} onClick={async()=>{
+                        if(!editingAreaName.trim()) return; setAreaOpError(null); setAreaSaving(true);
+                        try {
+                          const { error } = await supabase.from('responsible_areas').update({ name: editingAreaName.trim() }).eq('id', editingAreaId);
+                          if (error) throw error; setAreas(a=> a.map(ar=> ar.id===editingAreaId? { ...ar, name: editingAreaName.trim() }: ar));
+                          if(form.area === editingAreaName) setForm(f=>({...f}));
+                          setEditingAreaId(null); setEditingAreaName('');
+                        } catch(e:any){ setAreaOpError(e?.message || 'Error al actualizar área'); } finally { setAreaSaving(false); }
+                      }} className="px-3 py-1 rounded text-white text-xs bg-emerald-600 disabled:opacity-40">Guardar</button>
+                      <button disabled={areaSaving} onClick={()=>{ setEditingAreaId(null); setEditingAreaName(''); }} className="px-3 py-1 rounded text-white text-xs bg-slate-600">Cancelar</button>
+                    </>
+                  ) : (
+                    <button disabled={areaSaving || !newAreaName.trim()} onClick={async()=>{
+                      if(!newAreaName.trim()) return; setAreaOpError(null); setAreaSaving(true);
+                      try {
+                        const name = newAreaName.trim();
+                        if(areas.some(a=> a.name.toLowerCase() === name.toLowerCase())) { throw new Error('El área ya existe'); }
+                        const { data, error } = await supabase.from('responsible_areas').insert({ name }).select('id,name').single();
+                        if (error) throw error; if(data) setAreas(a=> [...a, data as any].sort((x,y)=> x.name.localeCompare(y.name)));
+                        setNewAreaName('');
+                      } catch(e:any){ setAreaOpError(e?.message || 'Error al crear área'); } finally { setAreaSaving(false); }
+                    }} className="px-3 py-1 rounded text-white text-xs bg-brand-primary disabled:opacity-40">Agregar</button>
+                  )}
+                </div>
+                {areaOpError && <p className="text-[11px] text-rose-300">{areaOpError}</p>}
+                <ul className="max-h-48 overflow-y-auto space-y-1 pr-1 text-[11px]">
+                  {areas.length === 0 && <li className="text-slate-400 italic">Sin áreas</li>}
+                  {areas.map(a=> (
+                    <li key={a.id} className="flex items-center gap-2 group">
+                      <span className="flex-1 truncate text-slate-200">{a.name}</span>
+                      <button onClick={()=>{ setEditingAreaId(a.id); setEditingAreaName(a.name); }} className="opacity-0 group-hover:opacity-100 transition text-xs px-2 py-0.5 rounded bg-white/10 text-slate-200 border border-white/10">Editar</button>
+                      <button onClick={async()=>{
+                        if(!confirm('¿Eliminar área?')) return; setAreaOpError(null); setAreaSaving(true);
+                        try {
+                          const { error } = await supabase.from('responsible_areas').delete().eq('id', a.id);
+                          if(error) throw error; setAreas(list=> list.filter(x=> x.id!==a.id));
+                          if(form.area === a.name) setForm(f=> ({ ...f, area: '' }));
+                        } catch(e:any){ setAreaOpError(e?.message || 'Error al eliminar área'); } finally { setAreaSaving(false); }
+                      }} className="opacity-0 group-hover:opacity-100 transition text-xs px-2 py-0.5 rounded bg-rose-600/80 text-white">X</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex justify-end">

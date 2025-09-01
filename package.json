@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+  "dev": "vite --port 5173",
+  "dev:fixed": "vite --port 5173",
     "build:css": "tailwindcss -i ./src/styles/tailwind.css -o ./dist/assets/tailwind.css --minify",
     "build": "npm run build:css && vite build",
     "preview": "vite preview",

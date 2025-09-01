@@ -72,8 +72,8 @@ FOR EACH ROW EXECUTE FUNCTION public._log_comment_insert();
 
 CREATE OR REPLACE FUNCTION public._log_document_insert() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE task_uuid uuid; BEGIN
-  SELECT task_id INTO task_uuid FROM public.sub_tasks WHERE id = NEW.sub_task_id;
-  PERFORM public._log_task_activity(task_uuid, NEW.sub_task_id, 'document_attached', NULL, NULL, left(NEW.name, 300));
+  task_uuid := NEW.task_id; -- Directly use task_id from the new document
+  PERFORM public._log_task_activity(task_uuid, NULL, 'document_attached', NULL, NULL, left(NEW.filename, 300)); -- Use NEW.filename and set sub_task_id to NULL
   RETURN NEW; END; $$;
 
 DROP TRIGGER IF EXISTS trg_log_document_insert ON public.documents;

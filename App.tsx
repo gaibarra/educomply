@@ -78,6 +78,45 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Mantiene la sesión sana y detecta tokens inválidos (refresh token rotation issues)
+  useEffect(() => {
+    if (!session) return; // sólo cuando hay sesión
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const { error } = await supabase.auth.getSession();
+        if (error && /invalid\s*refresh\s*token/i.test(error.message)) {
+          console.warn('[auth] Invalid refresh token detectado – forzando signOut');
+          await supabase.auth.signOut();
+          if (!cancelled) {
+            setFetchError(prev => prev ?? 'Tu sesión expiró. Inicia sesión nuevamente.');
+          }
+        }
+      } catch (e: any) {
+        if (e?.message && /invalid\s*refresh\s*token/i.test(e.message)) {
+          try { await supabase.auth.signOut(); } catch { /* ignore */ }
+          if (!cancelled) {
+            setFetchError(prev => prev ?? 'Tu sesión expiró. Inicia sesión nuevamente.');
+          }
+        }
+      }
+    }, 5 * 60 * 1000); // cada 5 minutos
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [session]);
+
+  // Sincroniza signOut multi‑pestaña y limpieza local
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === 'educomply-auth' && !e.newValue) {
+        setSession(null);
+        setProfile(null);
+        setInstitutionProfile(null);
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
+
   useEffect(() => {
     const fetchAppData = async () => {
       if (session?.user) {
@@ -227,7 +266,7 @@ const App: React.FC = () => {
       case 'proyectos':
         return <ProyectosView profile={profile} />;
       case 'usuarios':
-        return <UsersAdminView profile={profile} />;
+        return <UsersAdminView profile={profile} institutionProfile={institutionProfile} />;
       case 'reprogramar':
         return <AdminReprogramView profile={profile} />;
       default:

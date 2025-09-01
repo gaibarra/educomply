@@ -40,17 +40,35 @@ Deno.serve(async (req: Request) => {
   if (!email || !password || !full_name || !role) {
     return new Response(JSON.stringify({error:"Campos obligatorios: email, password, full_name, role"}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
   }
+  const allowedRoles = ['usuario','director_campus','director_facultad','admin'];
+  if (!allowedRoles.includes(role)) {
+    return new Response(JSON.stringify({error:`Rol inválido: ${role}. Permitidos: ${allowedRoles.join(', ')}`}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  }
+
+  // Pre-chequear si ya existe usuario con ese email (auth o profiles)
+  try {
+    const { data: existingProfile } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
+    if (existingProfile) {
+      return new Response(JSON.stringify({ error: 'Ya existe un perfil con ese correo.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+  } catch (_e) { /* ignore pre-check error */ }
 
   // Create auth user
   const authAdmin = supabase.auth.admin;
   const { data: created, error: createErr } = await authAdmin.createUser({ email, password, email_confirm: true });
-  if (createErr) return new Response(JSON.stringify({error:createErr.message}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  if (createErr) {
+    return new Response(JSON.stringify({error:createErr.message, stage:'auth_create'}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  }
   const newUserId = created.user?.id;
   if (!newUserId) return new Response(JSON.stringify({error:'No se obtuvo id del nuevo usuario'}),{status:500,headers:{...corsHeaders,'Content-Type':'application/json'}});
 
   // Insert profile row
   const { error: profErr } = await supabase.from('profiles').insert({ id: newUserId, email, full_name, role, scope_entity: null, mobile, position, campus, area });
-  if (profErr) return new Response(JSON.stringify({error:profErr.message}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  if (profErr) {
+    // Intentar revertir usuario auth si falla perfil
+    try { if (newUserId) { await authAdmin.deleteUser(newUserId); } } catch {/* ignore rollback error */}
+    return new Response(JSON.stringify({error:profErr.message, stage:'profile_insert'}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  }
 
   return new Response(JSON.stringify({ ok: true, user_id: newUserId }),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});
 });

@@ -11,9 +11,18 @@ const responseSchema = {
   properties: {
     name: { type: "string" },
     scope_level: { type: "string" },
-    scope_entity: { type: "string" }
+    scope_entity: { type: "string" },
+    phase_activities: {
+        type: "object",
+        properties: {
+            planificacion: { type: "object" },
+            ejecucion: { type: "object" },
+            evaluacion: { type: "object" },
+            seguimiento: { type: "object" },
+        }
+    }
   },
-  required: ["name", "scope_level", "scope_entity"]
+  required: ["name", "scope_level", "scope_entity", "phase_activities"]
 };
 
 Deno.serve(async (req: Request) => {
@@ -34,7 +43,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Robustly parse and validate the request body
-    const { description } = await req.json();
+    const { description, name } = await req.json();
     if (!description || typeof description !== 'string' || !description.trim()) {
       return new Response(
         JSON.stringify({ error: "Solicitud inválida: el campo 'description' es obligatorio." }),
@@ -45,7 +54,40 @@ Deno.serve(async (req: Request) => {
     // Construct the prompt and call the Gemini API
     const ai = new GoogleGenerativeAI(apiKey);
     const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const prompt = `Como un experto auditor de cumplimiento para instituciones educativas en México, analiza la siguiente descripción y extrae un plan de auditoría conciso. Responde exclusivamente en formato JSON. Descripción de la auditoría solicitada: "${description}"`;
+    const prompt = `Como un experto auditor de cumplimiento para instituciones educativas en México, analiza la siguiente descripción y extrae un plan de auditoría conciso.
+Descripción de la auditoría solicitada: "${description}"
+${name ? `El nombre de la auditoría es "${name}".` : ''}
+
+Responde exclusivamente en formato JSON con la siguiente estructura:
+{
+  "name": "<nombre de la auditoría>",
+  "scope_level": "<General | Campus | Nivel Educativo | Facultad/Escuela>",
+  "scope_entity": "<nombre de la entidad si aplica, si no, string vacío>",
+  "phase_activities": {
+    "planificacion": {
+      "activities": [
+        { "key": "<clave_corta>", "title": "<título de la actividad>" },
+        { "key": "<clave_corta_2>", "title": "<título de la actividad_2>" }
+      ]
+    },
+    "ejecucion": {
+      "activities": [
+        { "key": "<clave_corta>", "title": "<título de la actividad>" }
+      ]
+    },
+    "evaluacion": {
+      "activities": [
+        { "key": "<clave_corta>", "title": "<título de la actividad>" }
+      ]
+    },
+    "seguimiento": {
+      "activities": [
+        { "key": "<clave_corta>", "title": "<título de la actividad>" }
+      ]
+    }
+  }
+}
+Genera entre 3 y 5 actividades para cada fase. Las claves ('key') deben ser cortas, en snake_case y únicas.`
 
     const result = await model.generateContent(prompt);
     const text = await result.response.text();
@@ -63,8 +105,18 @@ Deno.serve(async (req: Request) => {
       const name = candidate?.name;
       const scope_level = candidate?.scope_level || candidate?.scopeLevel || 'General';
       const scope_entity = candidate?.scope_entity || candidate?.scopeEntity || '';
+      const phase_activities = candidate?.phase_activities;
+
       if (typeof name === 'string' && typeof scope_level === 'string') {
-        return { name, scope_level, scope_entity: typeof scope_entity === 'string' ? scope_entity : '' };
+        const res: any = {
+            name,
+            scope_level,
+            scope_entity: typeof scope_entity === 'string' ? scope_entity : '',
+        };
+        if (phase_activities && typeof phase_activities === 'object') {
+            res.phase_activities = phase_activities;
+        }
+        return res;
       }
       return null;
     };
